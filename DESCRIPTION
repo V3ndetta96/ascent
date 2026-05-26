@@ -12,3 +12,5 @@ Imports:
     ggplot2,
     patchwork,
     vegan
+URL: https://github.com/V3ndetta96/ascent
+BugReports: https://github.com/V3ndetta96/ascent/issues
