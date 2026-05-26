@@ -1,6 +1,7 @@
 # ascent: Functional Centroid Displacement Analysis in R <img src="man/figures/logo.png" align="right" height="139" />
 
 [![CRAN status](https://www.r-pkg.org/badges/version/ascent)](https://CRAN.R-project.org/package=ascent)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20388186.svg)](https://doi.org/10.5281/zenodo.20388186)
 [![R-CMD-check](https://github.com/V3ndetta96/ascent/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/tu-usuario/ascent/actions/workflows/R-CMD-check.yaml)
 The **`ascent`** (ASC-FCD) package provides a robust geometric and statistical framework to evaluate shifts in the functional structure of biological communities across environmental gradients, disturbances, or time series. 
 
