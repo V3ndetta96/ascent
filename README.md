@@ -55,10 +55,7 @@ For a detailed guide on the mathematical background and ecological interpretatio
 
 vignette("intro-to-ascent", package = "ascent")
 
-✒️ Citation
-If you use ascent in your research, please cite the original publication:
 ## ✒️ Citation
-
 While the official manuscript is in preparation, if you use `ascent` in your research, please cite the package directly:
 
 Muñoz-Li, R. R. & F. Alvarez-Denis (2026). ascent: Functional Centroid Displacement Analysis in R. R package version 0.1.0. https://github.com/V3ndetta96/ascent
