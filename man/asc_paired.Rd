@@ -10,7 +10,8 @@ asc_paired(
   sites,
   time,
   ref_time = NULL,
-  dist_method = "jaccard"
+  dist_method = "jaccard",
+  na.rm = TRUE
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ asc_paired(
 \item{ref_time}{Character. The specific value in \code{time} that acts as the baseline/reference. If NULL, uses the first unique value.}
 
 \item{dist_method}{Distance method for traits (default: "jaccard").}
+
+\item{na.rm}{Logical. Should missing values be removed during distance calculations? (default: TRUE).}
 }
 \value{
 An object of class \code{ascfcd}.

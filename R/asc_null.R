@@ -65,14 +65,17 @@ asc_null.ascfcd <- function(x, n_perm = 999, seed = 42) {
     p_traits[i] <- (sum(sim_traits >= obs_dist) + 1) / (n_perm + 1)
     p_abund[i]  <- (sum(sim_abund >= obs_dist) + 1) / (n_perm + 1)
 
-    # Standardized Effect Sizes (SES)
-    ses_traits[i] <- (obs_dist - mean(sim_traits)) / sd(sim_traits)
-    ses_abund[i]  <- (obs_dist - mean(sim_abund)) / sd(sim_abund)
+    # Standardized Effect Sizes (SES) con parche de división por cero
+    sd_traits <- sd(sim_traits)
+    sd_abund <- sd(sim_abund)
+
+    ses_traits[i] <- if (is.na(sd_traits) || sd_traits == 0) 0 else (obs_dist - mean(sim_traits)) / sd_traits
+    ses_abund[i]  <- if (is.na(sd_abund) || sd_abund == 0) 0 else (obs_dist - mean(sim_abund)) / sd_abund
   }
 
   x$null_models <- data.frame(
     Contrast = sites,
-    Obs_DeltaC = x$rDelta_C * (x$D_max / 100), # Back to absolute distance for reporting
+    Obs_DeltaC = x$rDelta_C * (x$D_max / 100),
     p_Traits = p_traits,
     SES_Traits = ses_traits,
     p_Abund = p_abund,
@@ -125,8 +128,13 @@ asc_null.ascfcd_pw <- function(x, n_perm = 999, seed = 42) {
 
     p_traits[i] <- (sum(sim_traits >= obs_dist) + 1) / (n_perm + 1)
     p_abund[i]  <- (sum(sim_abund >= obs_dist) + 1) / (n_perm + 1)
-    ses_traits[i] <- (obs_dist - mean(sim_traits)) / sd(sim_traits)
-    ses_abund[i]  <- (obs_dist - mean(sim_abund)) / sd(sim_abund)
+
+    # Standardized Effect Sizes (SES) con parche de división por cero
+    sd_traits <- sd(sim_traits)
+    sd_abund <- sd(sim_abund)
+
+    ses_traits[i] <- if (is.na(sd_traits) || sd_traits == 0) 0 else (obs_dist - mean(sim_traits)) / sd_traits
+    ses_abund[i]  <- if (is.na(sd_abund) || sd_abund == 0) 0 else (obs_dist - mean(sim_abund)) / sd_abund
   }
 
   x$pairwise_results$p_Traits <- p_traits

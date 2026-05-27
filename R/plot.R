@@ -26,15 +26,32 @@ plot.ascfcd <- function(x, contrast, ...) {
   }
 
   # ============================================================================
-  # DATA PREPARATION
+  # DATA PREPARATION & SAFETY CHECKS
   # ============================================================================
+  F_mat <- as.data.frame(x$F_matrix)
+  is_1d <- ncol(F_mat) == 1
+
+  if (is_1d) {
+    message("Note: The functional space is 1-dimensional. Generating a horizontal 1D trajectory plot.")
+    F_mat$Dim2 <- 0 # Creamos un eje Y artificial en 0
+    colnames(F_mat) <- c("Dim1", "Dim2")
+  } else {
+    colnames(F_mat) <- paste0("Dim", 1:ncol(F_mat))
+  }
+
   eje_critico <- x$critical_axes[contrast]
 
-  # Si el eje crítico es el 1, graficamos 1 vs 2. Si es otro, graficamos 1 vs Crítico.
-  eje_y <- ifelse(eje_critico == 1, 2, eje_critico)
-
-  F_mat <- as.data.frame(x$F_matrix)
-  colnames(F_mat) <- paste0("Dim", 1:ncol(F_mat))
+  # Manejo seguro para comunidades estáticas (Distancia = 0 -> eje_critico = NA)
+  if (is.na(eje_critico)) {
+    eje_y <- 2
+    crit_labels <- "No"
+  } else if (is_1d) {
+    eje_y <- 2 # Usamos el eje artificial
+    crit_labels <- ifelse(1:length(x$ASC_j_list[[contrast]]) == eje_critico, "Yes", "No")
+  } else {
+    eje_y <- ifelse(eje_critico == 1, 2, eje_critico)
+    crit_labels <- ifelse(1:length(x$ASC_j_list[[contrast]]) == eje_critico, "Yes", "No")
+  }
 
   # Coordenadas de las especies (Fondo)
   df_spp <- data.frame(
@@ -46,25 +63,36 @@ plot.ascfcd <- function(x, contrast, ...) {
   c_ref <- x$CWM_ref[contrast, ]
   c_comp <- x$CWM_comp[contrast, ]
 
+  # Si es 1D, el CWM solo tiene 1 valor, le forzamos la coordenada Y = 0
+  if (is_1d) {
+    c_ref_y <- 0
+    c_comp_y <- 0
+  } else {
+    c_ref_y <- c_ref[eje_y]
+    c_comp_y <- c_comp[eje_y]
+  }
+
   df_traj <- data.frame(
     Dim1 = c(c_ref[1], c_comp[1]),
-    Dim2 = c(c_ref[eje_y], c_comp[eje_y]),
+    Dim2 = c(c_ref_y, c_comp_y),
     Type = c("Reference", "Comparison")
   )
 
   # Datos para el gráfico de barras ASC
   asc_vals <- x$ASC_j_list[[contrast]]
+  asc_vals_plot <- ifelse(is.na(asc_vals), 0, asc_vals)
+
   df_asc <- data.frame(
-    Axis = factor(1:length(asc_vals)),
-    ASC = asc_vals,
-    Critical = ifelse(1:length(asc_vals) == eje_critico, "Yes", "No")
+    Axis = factor(1:length(asc_vals_plot)),
+    ASC = asc_vals_plot,
+    Critical = crit_labels
   )
 
   # ============================================================================
   # PANEL A: FUNCTIONAL SPACE (PCoA)
   # ============================================================================
   var_x <- round(x$Var_j[1] * 100, 1)
-  var_y <- round(x$Var_j[eje_y] * 100, 1)
+  var_y <- ifelse(is_1d, 0, round(x$Var_j[eje_y] * 100, 1))
 
   p1 <- ggplot() +
     # Nube de especies de fondo
@@ -83,12 +111,17 @@ plot.ascfcd <- function(x, contrast, ...) {
       title = sprintf("Functional Trajectory: %s", contrast),
       subtitle = sprintf("Relative Displacement (rDelta C): %.1f%%", x$rDelta_C[contrast]),
       x = sprintf("PCoA 1 (%.1f%%)", var_x),
-      y = sprintf("PCoA %d (%.1f%%)", eje_y, var_y)
+      y = if(is_1d) "Dummy Axis" else sprintf("PCoA %d (%.1f%%)", eje_y, var_y)
     ) +
     theme(
       panel.grid.minor = element_blank(),
       plot.title = element_text(face = "bold")
     )
+
+  if (is_1d) {
+    p1 <- p1 + scale_y_continuous(limits = c(-1, 1)) +
+      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  }
 
   # ============================================================================
   # PANEL B: ASC DECOMPOSITION

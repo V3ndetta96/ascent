@@ -4,7 +4,7 @@
 \alias{asc_pairwise}
 \title{Compute Pairwise ASC-FCD Network}
 \usage{
-asc_pairwise(traits, abund, dist_method = "jaccard")
+asc_pairwise(traits, abund, dist_method = "jaccard", na.rm = TRUE)
 }
 \arguments{
 \item{traits}{A data frame or matrix of species traits (rows = species, columns = traits).}
@@ -12,6 +12,8 @@ asc_pairwise(traits, abund, dist_method = "jaccard")
 \item{abund}{A data frame or matrix of species abundances (rows = communities, columns = species).}
 
 \item{dist_method}{Distance method for traits (default: "jaccard").}
+
+\item{na.rm}{Logical. Should missing values be removed during distance calculations? (default: TRUE).}
 }
 \value{
 An object of class \code{ascfcd_pw}.

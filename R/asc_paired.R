@@ -10,15 +10,21 @@
 #' @param time A character vector indicating the temporal or experimental group for each row. Must have exactly two levels.
 #' @param ref_time Character. The specific value in \code{time} that acts as the baseline/reference. If NULL, uses the first unique value.
 #' @param dist_method Distance method for traits (default: "jaccard").
+#' @param na.rm Logical. Should missing values be removed during distance calculations? (default: TRUE).
 #'
 #' @return An object of class \code{ascfcd}.
 #' @export
 #'
 #' @importFrom vegan vegdist
 #' @importFrom stats dist cmdscale
-asc_paired <- function(traits, abund, sites, time, ref_time = NULL, dist_method = "jaccard") {
+asc_paired <- function(traits, abund, sites, time, ref_time = NULL, dist_method = "jaccard", na.rm = TRUE) {
 
-  # 1. Validaciones
+  # 1. Validación estricta de formato numérico
+  if (!all(sapply(as.data.frame(traits), is.numeric))) {
+    stop("ascent requires the trait matrix to be strictly numeric or binary (0/1).\nPlease transform nominal/categorical variables into dummy variables before running the analysis.")
+  }
+
+  # 2. Validaciones de diseño experimental
   if (nrow(abund) != length(sites) || nrow(abund) != length(time)) {
     stop("The length of 'sites' and 'time' must match the number of rows in 'abund'.")
   }
@@ -39,7 +45,7 @@ asc_paired <- function(traits, abund, sites, time, ref_time = NULL, dist_method 
     comp_time <- setdiff(time_levels, ref_time)
   }
 
-  # 2. Separar y Alinear Matrices automáticamente
+  # 3. Separar y Alinear Matrices
   abund_ref <- abund[time == ref_time, , drop = FALSE]
   sites_ref <- sites[time == ref_time]
 
@@ -57,7 +63,7 @@ asc_paired <- function(traits, abund, sites, time, ref_time = NULL, dist_method 
   abund_ref <- abund_ref[common_sites, , drop = FALSE]
   abund_comp <- abund_comp[common_sites, , drop = FALSE]
 
-  # 3. Alinear con los rasgos
+  # 4. Alinear con los rasgos
   spp_abund <- colnames(abund_ref)
   spp_traits <- rownames(traits)
   common_spp <- intersect(spp_abund, spp_traits)
@@ -68,18 +74,17 @@ asc_paired <- function(traits, abund, sites, time, ref_time = NULL, dist_method 
   abund_comp <- abund_comp[, common_spp, drop = FALSE]
   traits <- traits[common_spp, , drop = FALSE]
 
-  # 4. Abundancias Relativas
+  # 5. Abundancias Relativas
   rel_ref <- sweep(abund_ref, 1, rowSums(abund_ref), "/")
   rel_ref[is.na(rel_ref)] <- 0
 
   rel_comp <- sweep(abund_comp, 1, rowSums(abund_comp), "/")
   rel_comp[is.na(rel_comp)] <- 0
 
-  # 5. Cálculo del PCoA
-  dist_func <- vegan::vegdist(traits, method = dist_method)
-  pcoa_res <- stats::cmdscale(dist_func, k = ncol(traits) - 1, eig = TRUE)
+  # 6. Cálculo del PCoA robusto
+  dist_func <- vegan::vegdist(traits, method = dist_method, na.rm = na.rm)
+  pcoa_res <- stats::cmdscale(dist_func, k = nrow(traits) - 1, eig = TRUE)
 
-  # Ajustar el filtro a las dimensiones reales generadas
   k_returned <- ncol(pcoa_res$points)
   eig_returned <- pcoa_res$eig[1:k_returned]
 
@@ -87,11 +92,9 @@ asc_paired <- function(traits, abund, sites, time, ref_time = NULL, dist_method 
   if(sum(valid_axes) == 0) stop("No positive eigenvalues in PCoA.")
 
   F_matrix <- pcoa_res$points[, valid_axes, drop = FALSE]
-
-  # Calcular la varianza respecto a la inercia positiva total del sistema
   Var_j <- eig_returned[valid_axes] / sum(pcoa_res$eig[pcoa_res$eig > 0])
 
-  # 6. Distancia Máxima y Desplazamientos
+  # 7. Distancia Máxima y Desplazamientos
   D_max <- sqrt(sum((apply(F_matrix, 2, max) - apply(F_matrix, 2, min))^2))
 
   CWM_ref <- as.matrix(rel_ref) %*% F_matrix
@@ -106,14 +109,22 @@ asc_paired <- function(traits, abund, sites, time, ref_time = NULL, dist_method 
   critical_axes <- numeric(length(common_sites))
   names(critical_axes) <- common_sites
 
+  # 8. Identificación del Eje Crítico
   for(i in seq_along(common_sites)) {
     sitio <- common_sites[i]
     delta_j <- delta_CWM[sitio, ]
     d_j <- abs(delta_j)
 
-    asc_j <- (d_j * Var_j) / sum(d_j * Var_j) * 100
-    ASC_j_list[[sitio]] <- asc_j
-    critical_axes[sitio] <- which.max(asc_j)
+    sum_dj_var <- sum(d_j * Var_j)
+
+    if (sum_dj_var == 0 || is.na(sum_dj_var)) {
+      ASC_j_list[[sitio]] <- rep(NA_real_, length(d_j))
+      critical_axes[sitio] <- NA_integer_
+    } else {
+      asc_j <- (d_j * Var_j) / sum_dj_var * 100
+      ASC_j_list[[sitio]] <- asc_j
+      critical_axes[sitio] <- which.max(asc_j)
+    }
   }
 
   res <- list(
