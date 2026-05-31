@@ -1,6 +1,6 @@
 # ascent: A multi-layer framework for decomposing functional community restructuring into positional, dispersive and boundary components under hierarchical null models.
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20388186.svg)](https://doi.org/10.5281/zenodo.20388186)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20480767.svg)](https://doi.org/10.5281/zenodo.20480767)
 The **`ascent`** package implements the **ASC-FCD** (Asymmetric Shift in Centroid - Functional Centroid Displacement) framework.
 
 Traditional functional ecology metrics often compress community dynamics into isolated indices, obscuring the underlying mechanisms of change. `ascent` provides a multi-layer topological approach to **decompose functional community restructuring into positional, dispersive, and boundary components under hierarchical null models.**
