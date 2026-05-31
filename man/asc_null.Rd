@@ -2,29 +2,21 @@
 % Please edit documentation in R/asc_null.R
 \name{asc_null}
 \alias{asc_null}
-\title{Compute Null Models for Functional Centroid Displacement}
+\title{Multi-Level Null Models for Multidimensional Functional Shifts}
 \usage{
-asc_null(x, n_perm = 999, seed = 42)
+asc_null(x, n_perm = 999, seed = NULL)
 }
 \arguments{
-\item{x}{An object of class \code{ascfcd} (paired) or \code{ascfcd_pw} (pairwise).}
+\item{x}{An object of class \code{ascfcd} or \code{ascfcd_pw}.}
 
-\item{n_perm}{Integer. Number of permutations (default: 999).}
+\item{n_perm}{Integer. Number of permutations. Default is 999.}
 
-\item{seed}{Integer. Seed for random number generation to ensure reproducibility.}
+\item{seed}{Integer. Random seed for reproducibility.}
 }
 \value{
-The original object appended with a \verb{$null_models} data frame containing
-p-values and Standardized Effect Sizes (SES) for both models.
+The original object with an appended \code{null_models} data frame.
 }
 \description{
-Evaluates the statistical significance and magnitude of functional displacement
-against two null expectations: Neutral Drift (Model 1: Trait shuffling) and
-Structural Resilience (Model 2: Abundance shuffling).
-}
-\examples{
-\dontrun{
-res <- asc_paired(traits, ref, comp)
-res_null <- asc_null(res, n_perm = 999)
-}
+Evaluates the statistical significance of functional shifts using three null models:
+Structural (Curveball), Quantitative (SAD Reshuffle), and Identity (Trait Shuffle).
 }

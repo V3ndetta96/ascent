@@ -2,37 +2,43 @@
 % Please edit documentation in R/asc_paired.R
 \name{asc_paired}
 \alias{asc_paired}
-\title{Compute Paired ASC-FCD}
+\title{Paired Functional Multidimensional Restructuring}
 \usage{
 asc_paired(
   traits,
   abund,
   sites,
   time,
-  ref_time = NULL,
-  dist_method = "jaccard",
+  ref_time,
+  dist_method = "gower",
+  dim_retention = c("variance", "broken_stick"),
+  var_tol = 0.8,
   na.rm = TRUE
 )
 }
 \arguments{
-\item{traits}{A data frame or matrix of species traits (rows = species, columns = traits).}
+\item{traits}{A data frame or matrix of functional traits.}
 
-\item{abund}{A data frame or matrix of species abundances (rows = samples, columns = species).}
+\item{abund}{A data frame or matrix of species abundances.}
 
-\item{sites}{A character vector indicating the site/plot identity for each row in \code{abund}.}
+\item{sites}{A vector indicating the site identifier.}
 
-\item{time}{A character vector indicating the temporal or experimental group for each row. Must have exactly two levels.}
+\item{time}{A vector indicating the temporal state.}
 
-\item{ref_time}{Character. The specific value in \code{time} that acts as the baseline/reference. If NULL, uses the first unique value.}
+\item{ref_time}{A character string specifying the reference state.}
 
-\item{dist_method}{Distance method for traits (default: "jaccard").}
+\item{dist_method}{Distance metric for the trait matrix. Default is "gower".}
 
-\item{na.rm}{Logical. Should missing values be removed during distance calculations? (default: TRUE).}
+\item{dim_retention}{Character. Method for dimensionality reduction.}
+
+\item{var_tol}{Numeric. Proportion of cumulative variance to retain. Default is 0.80.}
+
+\item{na.rm}{Logical. Remove missing values? Default is TRUE.}
 }
 \value{
-An object of class \code{ascfcd}.
+An S3 object of class \code{ascfcd}.
 }
 \description{
-Evaluates functional centroid shifts between paired communities (e.g., Before/After,
-Control/Impact) using a single abundance matrix and grouping vectors.
+Calculates centroid displacement (Layer 1), dispersion shift (Layer 2 - FDis),
+and volume shift (Layer 3 - FRic) between paired states.
 }

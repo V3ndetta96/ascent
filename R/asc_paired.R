@@ -1,147 +1,132 @@
-#' Compute Paired ASC-FCD
+#' Paired Functional Multidimensional Restructuring
 #'
 #' @description
-#' Evaluates functional centroid shifts between paired communities (e.g., Before/After,
-#' Control/Impact) using a single abundance matrix and grouping vectors.
+#' Calculates centroid displacement (Layer 1), dispersion shift (Layer 2 - FDis),
+#' and volume shift (Layer 3 - FRic) between paired states.
 #'
-#' @param traits A data frame or matrix of species traits (rows = species, columns = traits).
-#' @param abund A data frame or matrix of species abundances (rows = samples, columns = species).
-#' @param sites A character vector indicating the site/plot identity for each row in \code{abund}.
-#' @param time A character vector indicating the temporal or experimental group for each row. Must have exactly two levels.
-#' @param ref_time Character. The specific value in \code{time} that acts as the baseline/reference. If NULL, uses the first unique value.
-#' @param dist_method Distance method for traits (default: "jaccard").
-#' @param na.rm Logical. Should missing values be removed during distance calculations? (default: TRUE).
+#' @param traits A data frame or matrix of functional traits.
+#' @param abund A data frame or matrix of species abundances.
+#' @param sites A vector indicating the site identifier.
+#' @param time A vector indicating the temporal state.
+#' @param ref_time A character string specifying the reference state.
+#' @param dist_method Distance metric for the trait matrix. Default is "gower".
+#' @param dim_retention Character. Method for dimensionality reduction.
+#' @param var_tol Numeric. Proportion of cumulative variance to retain. Default is 0.80.
+#' @param na.rm Logical. Remove missing values? Default is TRUE.
 #'
-#' @return An object of class \code{ascfcd}.
+#' @return An S3 object of class \code{ascfcd}.
 #' @export
-#'
-#' @importFrom vegan vegdist
-#' @importFrom stats dist cmdscale
-asc_paired <- function(traits, abund, sites, time, ref_time = NULL, dist_method = "jaccard", na.rm = TRUE) {
+asc_paired <- function(traits, abund, sites, time, ref_time, dist_method = "gower",
+                       dim_retention = c("variance", "broken_stick"), var_tol = 0.80, na.rm = TRUE) {
 
-  # 1. Validación estricta de formato numérico
-  if (!all(sapply(as.data.frame(traits), is.numeric))) {
-    stop("ascent requires the trait matrix to be strictly numeric or binary (0/1).\nPlease transform nominal/categorical variables into dummy variables before running the analysis.")
+  dim_retention <- match.arg(dim_retention)
+  if (!requireNamespace("geometry", quietly = TRUE)) {
+    stop("The 'geometry' package is required for FRic calculations. Please install it.")
   }
 
-  # 2. Validaciones de diseño experimental
-  if (nrow(abund) != length(sites) || nrow(abund) != length(time)) {
-    stop("The length of 'sites' and 'time' must match the number of rows in 'abund'.")
-  }
+  if(nrow(traits) != ncol(abund)) stop("Number of species in traits and abundances does not match.")
+  abund_rel <- as.matrix(sweep(abund, 1, rowSums(abund, na.rm = na.rm), "/"))
 
-  time_levels <- unique(time)
-  if (length(time_levels) != 2) {
-    stop(sprintf("The 'time' vector must have exactly two unique conditions. Found: %d", length(time_levels)))
-  }
+  d_mat <- cluster::daisy(traits, metric = dist_method)
+  pcoa_res <- suppressWarnings(stats::cmdscale(d_mat, k = nrow(traits) - 1, eig = TRUE))
 
-  if (is.null(ref_time)) {
-    ref_time <- time_levels[1]
-    comp_time <- time_levels[2]
-    message(sprintf("No ref_time provided. Using '%s' as Reference and '%s' as Comparison.", ref_time, comp_time))
-  } else {
-    if (!(ref_time %in% time_levels)) {
-      stop(sprintf("The ref_time '%s' is not present in the 'time' vector.", ref_time))
+  eig_raw <- pcoa_res$eig
+  eig_pos <- eig_raw[eig_raw > 1e-8]
+  rel_var <- eig_pos / sum(eig_pos)
+  cum_var <- cumsum(rel_var)
+
+  if (dim_retention == "variance") {
+    k_valid <- min(which(cum_var >= var_tol))
+  } else if (dim_retention == "broken_stick") {
+    n_eig <- length(eig_pos)
+    bs_expected <- sapply(1:n_eig, function(k) sum(1 / (k:n_eig)) / n_eig)
+    k_valid <- sum(rel_var > bs_expected)
+  }
+  if(k_valid < 2) k_valid <- 2
+
+  axis_var <- rel_var[1:k_valid]
+  total_var_retained <- cum_var[k_valid]
+  F_mat <- pcoa_res$points[, 1:k_valid, drop = FALSE]
+  colnames(F_mat) <- paste0("Axis_", 1:k_valid)
+
+  # Motor Topológico Multicapa (FDis y FRic)
+  calc_topology <- function(abund_vec, F_space) {
+    idx <- abund_vec > 0
+    if(sum(idx) < 2) return(list(FDis = 0, FRic = 0))
+
+    p_pres <- abund_vec[idx] / sum(abund_vec[idx])
+    F_pres <- F_space[idx, , drop = FALSE]
+
+    centroid <- colSums(p_pres * F_pres)
+    dist_to_c <- sqrt(rowSums(sweep(F_pres, 2, centroid, "-")^2))
+    fdis <- sum(p_pres * dist_to_c)
+
+    fric <- 0
+    if (sum(idx) > ncol(F_space)) {
+      fric <- tryCatch({
+        geometry::convhulln(F_pres, options = "FA")$vol
+      }, error = function(e) 0)
     }
-    comp_time <- setdiff(time_levels, ref_time)
+    return(list(FDis = fdis, FRic = fric))
   }
 
-  # 3. Separar y Alinear Matrices
-  abund_ref <- abund[time == ref_time, , drop = FALSE]
-  sites_ref <- sites[time == ref_time]
+  cwm_global <- abund_rel %*% F_mat
+  Dmax_empirical <- max(stats::dist(cwm_global))
+  if(Dmax_empirical == 0) Dmax_empirical <- 1
 
-  abund_comp <- abund[time == comp_time, , drop = FALSE]
-  sites_comp <- sites[time == comp_time]
+  unique_sites <- unique(sites)
+  res_list <- list()
+  rDelta_C <- numeric(length(unique_sites))
+  names(rDelta_C) <- unique_sites
+  directional_vectors <- list(); p_ref_list <- list(); p_comp_list <- list()
+  cwm_ref_list <- list(); cwm_comp_list <- list()
 
-  common_sites <- intersect(sites_ref, sites_comp)
-  if (length(common_sites) == 0) {
-    stop("No matching sites found between the two time periods.")
+  for (s in unique_sites) {
+    idx <- which(sites == s)
+    abund_site <- abund_rel[idx, , drop = FALSE]
+    time_site <- time[idx]
+
+    idx_ref <- which(time_site == ref_time)
+    idx_comp <- which(time_site != ref_time)
+
+    if(length(idx_ref) == 0 || length(idx_comp) == 0) { rDelta_C[s] <- NA; next }
+
+    p_ref_mat <- if(nrow(abund_site[idx_ref, , drop=FALSE]) > 1) t(as.matrix(colMeans(abund_site[idx_ref, , drop=FALSE]))) else abund_site[idx_ref, , drop=FALSE]
+    p_comp_mat <- if(nrow(abund_site[idx_comp, , drop=FALSE]) > 1) t(as.matrix(colMeans(abund_site[idx_comp, , drop=FALSE]))) else abund_site[idx_comp, , drop=FALSE]
+
+    p_ref_list[[s]] <- p_ref_mat; p_comp_list[[s]] <- p_comp_mat
+    cwm_ref <- p_ref_mat %*% F_mat; cwm_comp <- p_comp_mat %*% F_mat
+    cwm_ref_list[[s]] <- cwm_ref; cwm_comp_list[[s]] <- cwm_comp
+
+    v_dir <- cwm_comp - cwm_ref
+    directional_vectors[[s]] <- v_dir
+    dist_abs <- sqrt(sum(v_dir^2))
+    rDelta_C[s] <- (dist_abs / Dmax_empirical) * 100
+
+    topo_ref <- calc_topology(as.numeric(p_ref_mat), F_mat)
+    topo_comp <- calc_topology(as.numeric(p_comp_mat), F_mat)
+
+    res_list[[s]] <- list(
+      abs_dist = dist_abs,
+      asc = (v_dir^2 / sum(v_dir^2)) * 100,
+      critical_axis = which.max((v_dir^2 / sum(v_dir^2)) * 100),
+      Delta_FDis = topo_comp$FDis - topo_ref$FDis,
+      Delta_FRic = topo_comp$FRic - topo_ref$FRic
+    )
   }
 
-  rownames(abund_ref) <- sites_ref
-  rownames(abund_comp) <- sites_comp
-
-  abund_ref <- abund_ref[common_sites, , drop = FALSE]
-  abund_comp <- abund_comp[common_sites, , drop = FALSE]
-
-  # 4. Alinear con los rasgos
-  spp_abund <- colnames(abund_ref)
-  spp_traits <- rownames(traits)
-  common_spp <- intersect(spp_abund, spp_traits)
-
-  if(length(common_spp) == 0) stop("No common species between traits and abundance matrices.")
-
-  abund_ref <- abund_ref[, common_spp, drop = FALSE]
-  abund_comp <- abund_comp[, common_spp, drop = FALSE]
-  traits <- traits[common_spp, , drop = FALSE]
-
-  # 5. Abundancias Relativas
-  rel_ref <- sweep(abund_ref, 1, rowSums(abund_ref), "/")
-  rel_ref[is.na(rel_ref)] <- 0
-
-  rel_comp <- sweep(abund_comp, 1, rowSums(abund_comp), "/")
-  rel_comp[is.na(rel_comp)] <- 0
-
-  # 6. Cálculo del PCoA robusto
-  dist_func <- vegan::vegdist(traits, method = dist_method, na.rm = na.rm)
-  pcoa_res <- stats::cmdscale(dist_func, k = nrow(traits) - 1, eig = TRUE)
-
-  k_returned <- ncol(pcoa_res$points)
-  eig_returned <- pcoa_res$eig[1:k_returned]
-
-  valid_axes <- eig_returned > 1e-8
-  if(sum(valid_axes) == 0) stop("No positive eigenvalues in PCoA.")
-
-  F_matrix <- pcoa_res$points[, valid_axes, drop = FALSE]
-  Var_j <- eig_returned[valid_axes] / sum(pcoa_res$eig[pcoa_res$eig > 0])
-
-  # 7. Distancia Máxima y Desplazamientos
-  D_max <- sqrt(sum((apply(F_matrix, 2, max) - apply(F_matrix, 2, min))^2))
-
-  CWM_ref <- as.matrix(rel_ref) %*% F_matrix
-  CWM_comp <- as.matrix(rel_comp) %*% F_matrix
-
-  delta_CWM <- CWM_comp - CWM_ref
-  Delta_C <- sqrt(rowSums(delta_CWM^2))
-  rDelta_C <- (Delta_C / D_max) * 100
-  names(rDelta_C) <- common_sites
-
-  ASC_j_list <- list()
-  critical_axes <- numeric(length(common_sites))
-  names(critical_axes) <- common_sites
-
-  # 8. Identificación del Eje Crítico
-  for(i in seq_along(common_sites)) {
-    sitio <- common_sites[i]
-    delta_j <- delta_CWM[sitio, ]
-    d_j <- abs(delta_j)
-
-    sum_dj_var <- sum(d_j * Var_j)
-
-    if (sum_dj_var == 0 || is.na(sum_dj_var)) {
-      ASC_j_list[[sitio]] <- rep(NA_real_, length(d_j))
-      critical_axes[sitio] <- NA_integer_
-    } else {
-      asc_j <- (d_j * Var_j) / sum_dj_var * 100
-      ASC_j_list[[sitio]] <- asc_j
-      critical_axes[sitio] <- which.max(asc_j)
-    }
-  }
-
-  res <- list(
-    traits = traits,
-    rel_ref = rel_ref,
-    rel_comp = rel_comp,
-    CWM_ref = CWM_ref,
-    CWM_comp = CWM_comp,
-    F_matrix = F_matrix,
-    Var_j = Var_j,
-    D_max = D_max,
-    rDelta_C = rDelta_C,
-    ASC_j_list = ASC_j_list,
-    critical_axes = critical_axes,
-    null_models = NULL
+  valid_sites <- !is.na(rDelta_C)
+  output <- list(
+    rDelta_C = rDelta_C[valid_sites],
+    Dmax_empirical = Dmax_empirical,
+    directional_vectors = directional_vectors,
+    p_ref = p_ref_list, p_comp = p_comp_list,
+    cwm_ref = cwm_ref_list, cwm_comp = cwm_comp_list,
+    site_results = res_list[valid_sites],
+    F_space = F_mat, k_retained = k_valid,
+    var_retained = total_var_retained, axis_var = axis_var,
+    original_traits = traits, original_abund = abund_rel
   )
-
-  class(res) <- c("ascfcd", "list")
-  return(res)
+  class(output) <- "ascfcd"
+  return(output)
 }

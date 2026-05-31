@@ -2,15 +2,18 @@
 % Please edit documentation in R/summary.R
 \name{summary.ascfcd_pw}
 \alias{summary.ascfcd_pw}
-\title{Print summary for ascfcd pairwise objects}
+\title{Summary for Pairwise Functional Spatial Divergence}
 \usage{
 \method{summary}{ascfcd_pw}(object, ...)
 }
 \arguments{
-\item{object}{An object of class ascfcd_pw}
+\item{object}{An object of class \code{ascfcd_pw}.}
 
 \item{...}{Further arguments passed to or from other methods.}
 }
+\value{
+Invisibly returns the pairwise results data frame.
+}
 \description{
-Print summary for ascfcd pairwise objects
+Provides a comprehensive overview of the spatial network ASC-FCD analysis.
 }

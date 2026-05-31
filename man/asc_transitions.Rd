@@ -2,20 +2,20 @@
 % Please edit documentation in R/asc_transitions.R
 \name{asc_transitions}
 \alias{asc_transitions}
-\title{Identify Functional Entity Transitions and Driver Species}
+\title{Extract Functional Transitions and Species Leverage}
 \usage{
-asc_transitions(x, top_n = 3)
+asc_transitions(x, ...)
 }
 \arguments{
-\item{x}{An object of class \code{ascfcd} (paired) or \code{ascfcd_pw} (pairwise).}
+\item{x}{An object of class \code{ascfcd} or \code{ascfcd_pw}.}
 
-\item{top_n}{Integer. Number of top contributing traits to consider (default: 3).}
+\item{...}{Further arguments passed to or from other methods.}
 }
 \value{
-A structured list of class \code{asc_trans}.
+A list of data frames containing species leverage for each contrast.
 }
 \description{
-Decomposes the critical axes of change into specific trait shifts and identifies
-the taxonomic drivers using Community Weighted Means (CWM) and Pearson correlation.
-Automatically handles binary and continuous traits.
+Calculates the multidimensional Functional Leverage of each species,
+quantifying their direct contribution to the positional shift (Layer 1 - Delta C)
+of the ecosystem.
 }

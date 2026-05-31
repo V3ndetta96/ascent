@@ -1,198 +1,148 @@
-#' Print summary for ascfcd paired objects
+#' Summary for Paired Functional Centroid Displacement
 #'
-#' @param object An object of class ascfcd
+#' @description
+#' Provides a concise, multi-layer overview of the paired ASC-FCD analysis,
+#' including null models and top functional drivers.
+#'
+#' @param object An object of class \code{ascfcd}.
 #' @param ... Further arguments passed to or from other methods.
 #'
+#' @return Invisibly returns a data frame with the displacement metrics.
 #' @export
 summary.ascfcd <- function(object, ...) {
-  cat("\n======================================================\n")
-  cat("   ASC-FCD: Functional Centroid Displacement Summary\n")
-  cat("======================================================\n")
-  cat(sprintf("Functional Space: %d traits collapsed to %d effective axes.\n",
-              ncol(object$traits), length(object$Var_j)))
-  cat(sprintf("Maximum Functional Distance (D_max): %.4f\n", object$D_max))
-  cat("------------------------------------------------------\n")
+  cat("==================================================\n")
+  cat(" ASC-FCD: Multidimensional Functional Restructuring \n")
+  cat("==================================================\n\n")
 
-  site_names <- names(object$rDelta_C)
-  has_null <- !is.null(object$null_models)
+  cat(sprintf("Number of Contrasts: %d\n", length(object$rDelta_C)))
+  cat(sprintf("Functional Dimensionality (k): %d (Explaining %.1f%% of variance)\n",
+              object$k_retained, object$var_retained * 100))
 
-  for(s in site_names){
-    base_str <- sprintf("Paired Contrast: %-10s | rDelta_C: %5.2f%% | Crit. Axis: %d (%.1f%% of change)",
-                        s, object$rDelta_C[s], object$critical_axes[s], object$ASC_j_list[[s]][object$critical_axes[s]])
+  df_dist <- data.frame(
+    Contrast = names(object$rDelta_C),
+    Layer1_rDeltaC = round(object$rDelta_C, 2),
+    Layer2_DeltaFDis = round(sapply(object$site_results, function(x) x$Delta_FDis), 4),
+    Layer3_DeltaFRic = round(sapply(object$site_results, function(x) x$Delta_FRic), 4)
+  )
 
-    if(has_null) {
-      row_null <- object$null_models[object$null_models$Contrast == s, ]
-      cat(sprintf("%s\n    -> p-val (Traits): %.3f | p-val (Abund): %.3f\n",
-                  base_str, row_null$p_Traits, row_null$p_Abund))
-    } else {
-      cat(base_str, "\n")
-    }
+  df_dist$Topology_Trend <- ifelse(df_dist$Layer3_DeltaFRic > 0, "Volume Expansion",
+                                   ifelse(df_dist$Layer3_DeltaFRic < 0, "Volume Contraction",
+                                          ifelse(df_dist$Layer2_DeltaFDis > 0.01, "Internal Expansion",
+                                                 ifelse(df_dist$Layer2_DeltaFDis < -0.01, "Internal Contraction", "Stable"))))
+
+  cat("\n--- Functional Shift Overview ---\n")
+  print(df_dist, row.names = FALSE)
+  cat("\n")
+
+  if (!is.null(object$null_models)) {
+    cat("--- Multi-Level Null Model Evaluation ---\n")
+    cat("Struct: Incidence Filter | Quant: Demographic Filter | Identity: Trait Filter\n\n")
+    print(object$null_models, row.names = FALSE)
+    cat("\n")
+  } else {
+    cat("Null models not evaluated. Run asc_null() to test for structural, quantitative, and identity shifts.\n\n")
   }
-  cat("======================================================\n")
+
+  # TOP 5 DRIVERS (Leverage Preview)
+  cat("--- Top Functional Drivers (Leverage Preview) ---\n")
+  trans <- asc_transitions(object)
+  df_drivers <- data.frame(Contrast = character(), Top_5_Drivers = character(), stringsAsFactors = FALSE)
+
+  for(s in names(trans)) {
+    top5 <- utils::head(trans[[s]]$species_leverage, 5)
+    drivers_str <- paste(sprintf("%s (%+.2f)", top5$Species, top5$Leverage), collapse = ", ")
+    df_drivers <- rbind(df_drivers, data.frame(Contrast = s, Top_5_Drivers = drivers_str))
+  }
+  print(df_drivers, row.names = FALSE)
+  cat("\n")
+
+  invisible(df_dist)
 }
 
-#' Print summary for ascfcd pairwise objects
+
+#' Summary for Pairwise Functional Spatial Divergence
 #'
-#' @param object An object of class ascfcd_pw
+#' @description
+#' Provides a comprehensive overview of the spatial network ASC-FCD analysis.
+#'
+#' @param object An object of class \code{ascfcd_pw}.
 #' @param ... Further arguments passed to or from other methods.
 #'
+#' @return Invisibly returns the pairwise results data frame.
 #' @export
 summary.ascfcd_pw <- function(object, ...) {
-  cat("\n======================================================\n")
-  cat("   ASC-FCD: Pairwise Functional Displacement Summary\n")
-  cat("======================================================\n")
-  cat(sprintf("Functional Space: %d traits collapsed to %d effective axes.\n",
-              ncol(object$traits), length(object$Var_j)))
-  cat(sprintf("Communities compared: %d | Total pairwise links: %d\n",
-              nrow(object$CWM_matrix), nrow(object$pairwise_results)))
-  cat("------------------------------------------------------\n")
-  cat("Top 5 largest functional shifts:\n")
+  cat("==================================================\n")
+  cat(" ASC-FCD: Pairwise Spatial Functional Network \n")
+  cat("==================================================\n\n")
 
-  df_sorted <- object$pairwise_results[order(-object$pairwise_results$rDelta_C_pct), ]
-  top_n <- min(5, nrow(df_sorted))
-  has_null <- "p_Traits" %in% colnames(df_sorted)
+  n_com <- nrow(object$cwm_global)
+  n_pairs <- nrow(object$pairwise_results)
 
-  for(i in 1:top_n){
-    row <- df_sorted[i, ]
-    base_str <- sprintf("%-10s vs %-10s | rDelta_C: %5.2f%% | Crit. Axis: %d (%.1f%%)",
-                        row$Community_A, row$Community_B,
-                        row$rDelta_C_pct, row$Critical_Axis, row$ASC_Critical_pct)
+  cat(sprintf("Communities Analyzed: %d | Spatial Contrasts: %d\n", n_com, n_pairs))
+  cat(sprintf("Functional Dimensionality (k): %d (Explaining %.1f%% of variance)\n\n",
+              object$k_retained, object$var_retained * 100))
 
-    if(has_null) {
-      cat(sprintf("%s\n    -> p-val (Traits): %.3f | p-val (Abund): %.3f\n",
-                  base_str, row$p_Traits, row$p_Abund))
-    } else {
-      cat(base_str, "\n")
-    }
+  cat("--- Global Divergence Summary ---\n")
+  rdelta <- object$pairwise_results$rDelta_C_pct
+  fdis_shifts <- object$pairwise_results$Delta_FDis
+  fric_shifts <- object$pairwise_results$Delta_FRic
+
+  cat(sprintf(" Mean Position Shift (rDelta_C): %6.2f%%\n", mean(rdelta)))
+  cat(sprintf(" Mean Dispersion Shift (Delta_FDis): %6.4f\n", mean(fdis_shifts)))
+  cat(sprintf(" Mean Volume Shift (Delta_FRic): %6.4f\n\n", mean(fric_shifts)))
+
+  if (!is.null(object$null_models)) {
+    cat("--- Multi-Level Null Model Evaluation (Head) ---\n")
+    cat("Struct: Incidence Filter | Quant: Demographic Filter | Identity: Trait Filter\n\n")
+    print(utils::head(object$null_models, 10), row.names = FALSE)
+    cat("\n")
   }
-  cat("======================================================\n")
+
+  # TOP 5 DRIVERS ESPACIALES (Leverage Preview)
+  cat("--- Top Functional Drivers (Leverage Preview - Head) ---\n")
+  trans <- asc_transitions(object)
+  df_drivers <- data.frame(Contrast = character(), Top_5_Drivers = character(), stringsAsFactors = FALSE)
+
+  for(s in names(trans)) {
+    top5 <- utils::head(trans[[s]]$species_leverage, 5)
+    drivers_str <- paste(sprintf("%s (%+.2f)", top5$Species, top5$Leverage), collapse = ", ")
+    df_drivers <- rbind(df_drivers, data.frame(Contrast = s, Top_5_Drivers = drivers_str))
+  }
+  print(utils::head(df_drivers, 5), row.names = FALSE)
+  cat("\n")
+
+  invisible(object$pairwise_results)
 }
 
-#' Print summary for asc_trans objects
+
+#' Summary for Baseline Functional Entities
 #'
-#' @param object An object of class asc_trans
+#' @description
+#' Provides an overview of the baseline functional topology of the evaluated entities.
+#'
+#' @param object An object of class \code{ascfcd_ent}.
 #' @param ... Further arguments passed to or from other methods.
 #'
+#' @return Invisibly returns the entities results data frame.
 #' @export
-summary.asc_trans <- function(object, ...) {
-  cat("\n======================================================\n")
-  cat("     ASC-FCD: Functional Traits & Species Transitions\n")
-  cat("======================================================\n")
+summary.ascfcd_ent <- function(object, ...) {
+  cat("==================================================\n")
+  cat(" ASC-FCD: Baseline Functional Topology \n")
+  cat("==================================================\n\n")
 
-  print_spp <- function(spp_list, label) {
-    cat(sprintf("\n%s:\n", label))
-    if (length(spp_list) > 0) {
-      for (sp in names(spp_list)) {
-        cat(sprintf("  -> %-15s | Abund. local: %5.1f%% -> %5.1f%%\n",
-                    sp, spp_list[[sp]]$Antes * 100, spp_list[[sp]]$Despues * 100))
-      }
-    } else {
-      cat("  (Ninguna especie local cumple esta condicion)\n")
-    }
-  }
+  cat(sprintf("Entities Analyzed: %d\n", nrow(object$entities_results)))
+  cat(sprintf("Functional Dimensionality (k): %d (Explaining %.1f%% of variance)\n\n",
+              object$k_retained, object$var_retained * 100))
 
-  contrasts <- names(object)
+  cat("--- Absolute Entity Metrics ---\n")
 
-  for (cnt in contrasts) {
-    cat(sprintf("\n>>> CONTRASTE / SITIO: %s (Eje Critico: %d)\n", toupper(cnt), object[[cnt]]$critical_axis))
-    cat("------------------------------------------------------\n")
-    cat("DIRECCION DE LOS RASGOS LIDERES (Basado en CWM):\n")
+  # Redondeo para limpieza visual en consola
+  print_df <- object$entities_results
+  num_cols <- sapply(print_df, is.numeric)
+  print_df[, num_cols] <- round(print_df[, num_cols], 4)
 
-    traits_det <- object[[cnt]]$traits_evaluated
-    for (tr in names(traits_det)) {
-      t_data <- traits_det[[tr]]
-      verbo_t <- ifelse(t_data$Dif > 0, "AUMENTO   [+]", "DISMINUYO [-]")
+  print(print_df, row.names = FALSE)
+  cat("\n")
 
-      if(t_data$is_binary) {
-        cat(sprintf("  %s %-25s | %5.1f%% -> %5.1f%% (Dif: %5.1f%%)\n",
-                    verbo_t, tr, t_data$Antes * 100, t_data$Despues * 100, t_data$Dif * 100))
-      } else {
-        cat(sprintf("  %s %-25s | %5.2f -> %5.2f (Dif: %5.2f)\n",
-                    verbo_t, tr, t_data$Antes, t_data$Despues, t_data$Dif))
-      }
-    }
-
-    print_spp(object[[cnt]]$win_strict,  "[++] GANADORAS ESTRICTAS (Impulsan TODOS los rasgos principales)")
-    print_spp(object[[cnt]]$win_partial, "[+] GANADORAS PARCIALES (Impulsan AL MENOS 1 rasgo principal)")
-    print_spp(object[[cnt]]$lose_strict, "[--] PERDEDORAS ESTRICTAS (Retraen TODOS los rasgos principales)")
-    print_spp(object[[cnt]]$lose_partial, "[-] PERDEDORAS PARCIALES (Retraen AL MENOS 1 rasgo principal)")
-
-    cat("======================================================\n")
-  }
-}
-
-#' Print summary for asc_fe objects
-#'
-#' @param object An object of class asc_fe
-#' @param ... Further arguments passed to or from other methods.
-#'
-#' @export
-summary.asc_fe <- function(object, ...) {
-  cat("\n======================================================\n")
-  cat("       ASC-FCD: Functional Entities Summary\n")
-  cat("======================================================\n")
-  cat(sprintf("Total Species Analyzed: %d\n", object$n_species))
-  cat(sprintf("Unique Functional Entities (FEs): %d\n", object$n_entities))
-  cat(sprintf("Average Redundancy: %.2f species per FE\n", mean(object$functional_redundancy)))
-  cat("------------------------------------------------------\n")
-  cat("Top 5 Most Redundant FEs, Species & Traits:\n")
-
-  # Ordenar de mayor a menor redundancia
-  df_sorted <- object$fe_summary[order(-object$fe_summary$Redundancy), ]
-  top_n <- min(5, nrow(df_sorted))
-
-  # Extraer la matriz de rasgos pura (sin la columna Redundancy)
-  traits_df <- df_sorted[, -1, drop = FALSE]
-
-  # PASO CLAVE: Identificar automáticamente cuáles rasgos son estrictamente binarios
-  is_binary <- sapply(traits_df, function(col) {
-    is.numeric(col) && all(col %in% c(0, 1, NA))
-  })
-
-  for(i in 1:top_n) {
-    fe_id <- rownames(df_sorted)[i]
-    redun <- df_sorted$Redundancy[i]
-
-    # Extraer las especies
-    spp_list <- paste(object$fe_species[[fe_id]], collapse = ", ")
-
-    # Extraer y formatear los rasgos inteligentemente
-    fe_vals <- traits_df[i, , drop = FALSE]
-    rasgos_str_list <- c()
-
-    for(j in seq_along(fe_vals)) {
-      t_name <- colnames(fe_vals)[j]
-      t_val <- fe_vals[1, j]
-
-      if(is_binary[j]) {
-        # LÓGICA CLÁSICA: Si es binario y vale 1, solo mostramos el nombre
-        if(!is.na(t_val) && t_val == 1) {
-          rasgos_str_list <- c(rasgos_str_list, t_name)
-        }
-      } else {
-        # LÓGICA NUEVA: Si es continuo/categórico, mostramos "Nombre: Valor"
-        if(is.numeric(t_val)) {
-          rasgos_str_list <- c(rasgos_str_list, sprintf("%s: %.2f", t_name, t_val))
-        } else {
-          rasgos_str_list <- c(rasgos_str_list, sprintf("%s: %s", t_name, as.character(t_val)))
-        }
-      }
-    }
-
-    if (length(rasgos_str_list) > 0) {
-      # Usamos una barra vertical para separar los rasgos continuos limpiamente
-      rasgos_str <- paste(rasgos_str_list, collapse = " | ")
-    } else {
-      rasgos_str <- "(No se detectaron rasgos distintivos)"
-    }
-
-    cat(sprintf("\n  [%s] Redundancy: %d species\n", fe_id, redun))
-    cat(sprintf("   -> Species: %s\n", spp_list))
-    cat(sprintf("   -> Traits : %s\n", rasgos_str))
-  }
-
-  cat("\n======================================================\n")
-  cat("* Tip: To see the species for ALL entities, type `your_object$fe_species`\n")
-  cat("* Tip: To see the full trait matrix, type `your_object$fe_summary`\n")
-  cat("======================================================\n")
+  invisible(object$entities_results)
 }

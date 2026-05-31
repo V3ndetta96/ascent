@@ -2,28 +2,34 @@
 % Please edit documentation in R/asc_entities.R
 \name{asc_entities}
 \alias{asc_entities}
-\title{Identify Functional Entities (FEs) and Redundancy}
+\title{Baseline Functional Topology of Entities}
 \usage{
-asc_entities(traits)
+asc_entities(
+  traits,
+  abund,
+  dist_method = "gower",
+  dim_retention = c("variance", "broken_stick"),
+  var_tol = 0.8,
+  na.rm = TRUE
+)
 }
 \arguments{
-\item{traits}{A data frame or matrix of species (rows) by functional traits (columns).}
+\item{traits}{A data frame or matrix of functional traits.}
+
+\item{abund}{A data frame or matrix of species abundances.}
+
+\item{dist_method}{Distance metric for the trait matrix. Default is "gower".}
+
+\item{dim_retention}{Character. Method for dimensionality reduction. Options are \code{"variance"} or \code{"broken_stick"}.}
+
+\item{var_tol}{Numeric. Proportion of cumulative variance to retain. Default is 0.80.}
+
+\item{na.rm}{Logical. Remove missing values? Default is TRUE.}
 }
 \value{
-An S3 object of class \code{asc_fe} containing:
-\describe{
-\item{fe_summary}{A data frame with FE IDs, species richness (redundancy), and trait profiles.}
-\item{fe_species}{A list where each element contains the names of the species belonging to a specific FE.}
-\item{functional_redundancy}{Numeric vector with the number of species per FE.}
-}
+An S3 object of class \code{ascfcd_ent}.
 }
 \description{
-Groups species into Functional Entities (FEs) based on their unique trait combinations.
-It calculates the functional redundancy (number of species per FE) and maps species
-to their corresponding FE.
-}
-\examples{
-\dontrun{
-fe_info <- asc_entities(traits)
-}
+Calculates the absolute functional centroid (CWM), functional dispersion (FDis),
+and convex hull volume (FRic) for each community or site independently.
 }

@@ -1,61 +1,88 @@
-# ascent: Functional Centroid Displacement Analysis in R 
+# ascent: A multi-layer framework for decomposing functional community restructuring into positional, dispersive and boundary components under hierarchical null models.
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20388186.svg)](https://doi.org/10.5281/zenodo.20388186)
-The **`ascent`** (ASC-FCD) package provides a robust geometric and statistical framework to evaluate shifts in the functional structure of biological communities across environmental gradients, disturbances, or time series. 
+The **`ascent`** package implements the **ASC-FCD** (Asymmetric Shift in Centroid - Functional Centroid Displacement) framework.
 
-Unlike traditional functional diversity metrics that merely quantify the magnitude of change, `ascent` identifies the statistical direction of functional displacement, assesses ecosystem resilience through null models, and taxonomically isolates the "winning" and "losing" species driving the turnover.
+Traditional functional ecology metrics often compress community dynamics into isolated indices, obscuring the underlying mechanisms of change. `ascent` provides a multi-layer topological approach to **decompose functional community restructuring into positional, dispersive, and boundary components under hierarchical null models.**
 
-## 🚀 Key Features
+Whether you are evaluating temporal perturbations (e.g., deforestation, climate change) or spatial beta-diversity gradients, `ascent` allows you to track the exact geometric trajectory of ecosystems and identify the specific taxa driving these shifts.
 
-* **Universal Trait Support:** Seamlessly handles binary, categorical, and continuous traits using Gower distances and Community Weighted Means (CWM) under the hood.
-* **Paired and Network Designs:** Contrast specific temporal/spatial pairs (e.g., Before/After impact) or compute complex pairwise networks across multiple communities.
-* **Null Model Integration:** Distinguish between neutral ecological drift and environmental filtering by assessing the structural resilience of the community.
-* **Taxonomic Transitions:** Decompose critical axes of change to pinpoint the exact Functional Entities (FE) and species driving the ecological shift.
-* **Functional Redundancy:** Quantify redundancy and identify unique Functional Entities to assess system vulnerability to local extinctions.
+## 🧠 Core Architecture
 
-## 📦 Installation
+The framework evaluates ecological dynamics by deconstructing them into three orthogonal geometric layers within the functional hyperspace:
 
-You can install the development version of `ascent` from [GitHub](https://github.com/) with:
+1. **Positional Component ($\Delta C$):** The net directional displacement of the community centroid. Measures the fundamental shift in the ecosystem's functional equilibrium.
+2. **Dispersive Component ($\Delta FDis$):** The internal demographic reorganization. Quantifies whether biomass is concentrating into central redundant strategies or expanding towards peripheral phenotypes.
+3. **Boundary Component ($\Delta FRic$):** The multidimensional Convex Hull volume. Captures the strict colonization of novel functional space or the extinction of extreme phenotypes.
+
+### The Triad of Null Models
+To isolate deterministic environmental filtering from stochastic noise, shifts are evaluated against a hierarchy of null models:
+* **Structural Filter (Incidence/Curveball):** Does the taxonomic turnover alter the topology more than expected by chance?
+* **Quantitative Filter (Demographic/SAD):** Is the internal biomass redirection deterministic?
+* **Identity Filter (Trait Shuffle):** Given the observed richness and abundances, are the selected functional strategies significantly different from a random draw of the regional pool?
+
+## 🚀 Installation
+
+You can install the development version of `ascent` from GitHub with:
 
 ```r
 # install.packages("devtools")
-devtools::install_github("V3ndetta96/ascent")
+devtools::install_github("tu-usuario/ascent")
 
-💡 Quick Start (Usage)
-Here is a basic workflow to evaluate the functional impact of an environmental disturbance on an estuarine community:
+💻 Quick Start
+Here is a basic workflow evaluating the functional impact of deforestation on a bird community using mixed trait data (quantitative and binary).
+library(ascent)
 
 library(ascent)
 
-# 1. Load your data (Traits matrix and Abundance matrix)
-traits <- read.csv("traits_matrix.csv", row.names = 1)
-abund <- read.csv("abundance_matrix.csv", row.names = 1)
+# 1. Define Traits and Abundances
+# Note: Binary traits are set as factors to use the Gower metric.
+traits <- data.frame(
+  Body_Mass = c(15, 20, 30, 45, 60, 90, 150, 250, 400, 600),
+  Frugivore = factor(c(0, 0, 1, 1, 1, 0, 1, 1, 1, 0))
+)
+rownames(traits) <- paste0("Sp", 1:10)
 
-# 2. Define experimental design vectors
-time_vec <- ifelse(grepl("_before$", rownames(abund)), "Before", "After")
-site_vec <- gsub("_before$|_after$", "", rownames(abund))
+abund_time <- rbind(
+  Reference = c( 0,  0, 10, 15, 25, 20, 10, 8, 4, 2), # Old-growth forest
+  Impacted  = c(40, 35, 15,  5,  0,  0,  0, 0, 0, 0)  # Deforested
+)
 
-# 3. Compute paired functional centroid shifts
-res_paired <- asc_paired(traits = traits, 
-                         abund = abund, 
-                         sites = site_vec, 
-                         time = time_vec, 
-                         ref_time = "Before")
+# 2. Execute the Paired Multi-Layer Framework
+res <- asc_paired(
+  traits = traits, abund = abund_time, 
+  sites = c("Site1", "Site1"), time = c("Reference", "Impacted"),
+  ref_time = "Reference", dist_method = "gower"
+)
 
-# 4. Run null models (resilience) and extract species transitions
-res_paired <- asc_null(res_paired, n_perm = 999)
-transitions <- asc_transitions(res_paired, top_n = 3)
+# 3. Evaluate Hierarchical Null Models
+res <- asc_null(res, n_perm = 999, seed = 123)
 
-# 5. Review results and plot
-summary(res_paired)
-summary(transitions)
-plot(res_paired, contrast = "Site_A")
+# 4. View Automated Ecological Diagnostic
+summary(res)
 
-📖 Documentation
-For a detailed guide on the mathematical background and ecological interpretation of the ASC-FCD metric, please read the package vignette:
+Visualizing Dynamic Topology and Functional Leverage
+ascent includes built-in ggplot2/patchwork methods to visualize the PCoA trajectory, the 2D Convex Hull boundaries, and the Functional Leverage (the specific taxa pulling or releasing the centroid).
 
-vignette("intro-to-ascent", package = "ascent")
+plot(res, contrast = "Site1", type = "both", n_sp = 5)
+
+🛠️ Package API Overview
+asc_entities(): Calculates the absolute baseline functional topology (CWM, FDis, FRic) for isolated communities.
+
+asc_paired(): Evaluates temporal or paired experimental contrasts.
+
+asc_pairwise(): Computes bidirectional spatial divergence across all combinations in a regional network (Beta-diversity).
+
+asc_null(): Triggers the triad of null models (Structural, Quantitative, Identity).
+
+asc_transitions(): Extracts the exact multidimensional leverage score for every species.
+
+📖 Documentation & Vignettes
+For a comprehensive guide, including spatial network analyses and detailed ecological interpretations, please read the official vignette:
+
+vignette("ascent_tutorial")
 
 ## ✒️ Citation
 While the official manuscript is in preparation, if you use `ascent` in your research, please cite the package directly:
 
-Muñoz-Li, R. R. & F. Alvarez-Denis (2026). ascent: Functional Centroid Displacement Analysis in R. R package version 0.1.0. https://github.com/V3ndetta96/ascent
+Muñoz-Li, R. R. & F. Alvarez-Denis (2026). ascent: A multi-layer framework for decomposing functional community restructuring into positional, dispersive and boundary components under hierarchical null models. https://github.com/V3ndetta96/ascent

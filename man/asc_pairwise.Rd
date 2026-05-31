@@ -2,23 +2,33 @@
 % Please edit documentation in R/asc_pairwise.R
 \name{asc_pairwise}
 \alias{asc_pairwise}
-\title{Compute Pairwise ASC-FCD Network}
+\title{Pairwise Functional Spatial Divergence}
 \usage{
-asc_pairwise(traits, abund, dist_method = "jaccard", na.rm = TRUE)
+asc_pairwise(
+  traits,
+  abund,
+  dist_method = "gower",
+  dim_retention = c("variance", "broken_stick"),
+  var_tol = 0.8,
+  na.rm = TRUE
+)
 }
 \arguments{
-\item{traits}{A data frame or matrix of species traits (rows = species, columns = traits).}
+\item{traits}{A data frame or matrix of functional traits.}
 
-\item{abund}{A data frame or matrix of species abundances (rows = communities, columns = species).}
+\item{abund}{A data frame or matrix of species abundances.}
 
-\item{dist_method}{Distance method for traits (default: "jaccard").}
+\item{dist_method}{Distance metric for the trait matrix. Default is "gower".}
 
-\item{na.rm}{Logical. Should missing values be removed during distance calculations? (default: TRUE).}
+\item{dim_retention}{Character. Method for dimensionality reduction.}
+
+\item{var_tol}{Numeric. Proportion of cumulative variance to retain. Default is 0.80.}
+
+\item{na.rm}{Logical. Remove missing values? Default is TRUE.}
 }
 \value{
-An object of class \code{ascfcd_pw}.
+An S3 object of class \code{ascfcd_pw}.
 }
 \description{
-Computes the functional displacement for all possible pairwise combinations
-of communities (rows) in the abundance matrix.
+Calculates spatial functional divergence across three layers: position (Delta C), dispersion (FDis), and volume (FRic).
 }

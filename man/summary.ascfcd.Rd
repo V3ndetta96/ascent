@@ -2,15 +2,19 @@
 % Please edit documentation in R/summary.R
 \name{summary.ascfcd}
 \alias{summary.ascfcd}
-\title{Print summary for ascfcd paired objects}
+\title{Summary for Paired Functional Centroid Displacement}
 \usage{
 \method{summary}{ascfcd}(object, ...)
 }
 \arguments{
-\item{object}{An object of class ascfcd}
+\item{object}{An object of class \code{ascfcd}.}
 
 \item{...}{Further arguments passed to or from other methods.}
 }
+\value{
+Invisibly returns a data frame with the displacement metrics.
+}
 \description{
-Print summary for ascfcd paired objects
+Provides a concise, multi-layer overview of the paired ASC-FCD analysis,
+including null models and top functional drivers.
 }

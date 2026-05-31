@@ -1,66 +1,97 @@
-#' Identify Functional Entities (FEs) and Redundancy
+#' Baseline Functional Topology of Entities
 #'
 #' @description
-#' Groups species into Functional Entities (FEs) based on their unique trait combinations.
-#' It calculates the functional redundancy (number of species per FE) and maps species
-#' to their corresponding FE.
+#' Calculates the absolute functional centroid (CWM), functional dispersion (FDis),
+#' and convex hull volume (FRic) for each community or site independently.
 #'
-#' @param traits A data frame or matrix of species (rows) by functional traits (columns).
+#' @param traits A data frame or matrix of functional traits.
+#' @param abund A data frame or matrix of species abundances.
+#' @param dist_method Distance metric for the trait matrix. Default is "gower".
+#' @param dim_retention Character. Method for dimensionality reduction. Options are \code{"variance"} or \code{"broken_stick"}.
+#' @param var_tol Numeric. Proportion of cumulative variance to retain. Default is 0.80.
+#' @param na.rm Logical. Remove missing values? Default is TRUE.
 #'
-#' @return An S3 object of class \code{asc_fe} containing:
-#' \describe{
-#'   \item{fe_summary}{A data frame with FE IDs, species richness (redundancy), and trait profiles.}
-#'   \item{fe_species}{A list where each element contains the names of the species belonging to a specific FE.}
-#'   \item{functional_redundancy}{Numeric vector with the number of species per FE.}
-#' }
+#' @return An S3 object of class \code{ascfcd_ent}.
 #' @export
-#'
-#' @examples
-#' \dontrun{
-#' fe_info <- asc_entities(traits)
-#' }
-asc_entities <- function(traits) {
+asc_entities <- function(traits, abund, dist_method = "gower",
+                         dim_retention = c("variance", "broken_stick"), var_tol = 0.80, na.rm = TRUE) {
 
-  traits_df <- as.data.frame(traits)
-
-  # Crear una "firma" única para cada especie uniendo sus valores de rasgos
-  signatures <- apply(traits_df, 1, paste, collapse = "_")
-  unique_sigs <- unique(signatures)
-  n_fe <- length(unique_sigs)
-
-  # Generar nombres limpios (FE_1, FE_2, ...)
-  fe_names <- paste0("FE_", seq_len(n_fe))
-  names(fe_names) <- unique_sigs
-
-  # Mapear las firmas a las especies
-  fe_species <- list()
-  for(i in seq_along(unique_sigs)) {
-    sig <- unique_sigs[i]
-    spp <- rownames(traits_df)[signatures == sig]
-    fe_species[[fe_names[sig]]] <- spp
+  dim_retention <- match.arg(dim_retention)
+  if (!requireNamespace("geometry", quietly = TRUE)) {
+    stop("The 'geometry' package is required for FRic calculations.")
   }
 
-  # Crear la tabla resumen extrayendo el perfil de rasgos
-  first_spp_idx <- match(unique_sigs, signatures)
-  fe_summary <- traits_df[first_spp_idx, , drop = FALSE]
-  rownames(fe_summary) <- fe_names[unique_sigs]
+  if(nrow(traits) != ncol(abund)) stop("Number of species in traits and abundances does not match.")
+  abund_rel <- as.matrix(sweep(abund, 1, rowSums(abund, na.rm = na.rm), "/"))
 
-  # Añadir la columna de redundancia (Riqueza de especies por FE)
-  redundancy <- sapply(fe_species, length)
-  fe_summary$Redundancy <- redundancy
+  d_mat <- cluster::daisy(traits, metric = dist_method)
+  pcoa_res <- suppressWarnings(stats::cmdscale(d_mat, k = nrow(traits) - 1, eig = TRUE))
 
-  # Reordenar para que la Redundancia sea la primera columna
-  fe_summary <- cbind(Redundancy = fe_summary$Redundancy,
-                      fe_summary[, -ncol(fe_summary), drop = FALSE])
+  eig_raw <- pcoa_res$eig
+  eig_pos <- eig_raw[eig_raw > 1e-8]
+  rel_var <- eig_pos / sum(eig_pos)
+  cum_var <- cumsum(rel_var)
 
-  res <- list(
-    fe_summary = fe_summary,
-    fe_species = fe_species,
-    functional_redundancy = redundancy,
-    n_entities = n_fe,
-    n_species = nrow(traits_df)
+  if (dim_retention == "variance") {
+    k_valid <- min(which(cum_var >= var_tol))
+  } else if (dim_retention == "broken_stick") {
+    n_eig <- length(eig_pos)
+    bs_expected <- sapply(1:n_eig, function(k) sum(1 / (k:n_eig)) / n_eig)
+    k_valid <- sum(rel_var > bs_expected)
+  }
+  if(k_valid < 2) k_valid <- 2
+
+  axis_var <- rel_var[1:k_valid]
+  total_var_retained <- cum_var[k_valid]
+  F_mat <- pcoa_res$points[, 1:k_valid, drop = FALSE]
+  colnames(F_mat) <- paste0("Axis_", 1:k_valid)
+
+  # Motor Topológico Base
+  calc_topo <- function(p_vec, f_space) {
+    idx <- p_vec > 0
+    if(sum(idx) < 2) return(list(FDis = 0, FRic = 0))
+    p_pres <- p_vec[idx] / sum(p_vec[idx])
+    f_pres <- f_space[idx, , drop = FALSE]
+    cent <- colSums(p_pres * f_pres)
+    fdis <- sum(p_pres * sqrt(rowSums(sweep(f_pres, 2, cent, "-")^2)))
+
+    fric <- 0
+    if (sum(idx) > ncol(f_space)) {
+      fric <- tryCatch({ geometry::convhulln(f_pres, options = "FA")$vol }, error = function(e) 0)
+    }
+    return(list(FDis = fdis, FRic = fric))
+  }
+
+  cwm_global <- abund_rel %*% F_mat
+  entities <- rownames(abund_rel)
+
+  res_df <- data.frame(Entity = entities)
+  for(j in 1:k_valid) {
+    res_df[[paste0("CWM_Axis_", j)]] <- cwm_global[, j]
+  }
+
+  fdis_vals <- numeric(length(entities))
+  fric_vals <- numeric(length(entities))
+
+  for(i in seq_along(entities)) {
+    topo <- calc_topo(abund_rel[i, ], F_mat)
+    fdis_vals[i] <- topo$FDis
+    fric_vals[i] <- topo$FRic
+  }
+
+  res_df$FDis <- fdis_vals
+  res_df$FRic <- fric_vals
+
+  output <- list(
+    entities_results = res_df,
+    cwm_global = cwm_global,
+    F_space = F_mat,
+    k_retained = k_valid,
+    var_retained = total_var_retained,
+    axis_var = axis_var,
+    original_traits = traits,
+    original_abund = abund_rel
   )
-
-  class(res) <- c("asc_fe", "list")
-  return(res)
+  class(output) <- "ascfcd_ent"
+  return(output)
 }

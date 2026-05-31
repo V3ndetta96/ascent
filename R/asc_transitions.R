@@ -1,246 +1,71 @@
-#' Identify Functional Entity Transitions and Driver Species
+#' Extract Functional Transitions and Species Leverage
 #'
 #' @description
-#' Decomposes the critical axes of change into specific trait shifts and identifies
-#' the taxonomic drivers using Community Weighted Means (CWM) and Pearson correlation.
-#' Automatically handles binary and continuous traits.
+#' Calculates the multidimensional Functional Leverage of each species,
+#' quantifying their direct contribution to the positional shift (Layer 1 - Delta C)
+#' of the ecosystem.
 #'
-#' @param x An object of class `ascfcd` (paired) or `ascfcd_pw` (pairwise).
-#' @param top_n Integer. Number of top contributing traits to consider (default: 3).
+#' @param x An object of class \code{ascfcd} or \code{ascfcd_pw}.
+#' @param ... Further arguments passed to or from other methods.
 #'
-#' @return A structured list of class `asc_trans`.
+#' @return A list of data frames containing species leverage for each contrast.
 #' @export
-asc_transitions <- function(x, top_n = 3) {
-  UseMethod("asc_transitions")
-}
-
-#' @export
-asc_transitions.ascfcd <- function(x, top_n = 3) {
-  cat("\nExtracting functional transitions for paired communities...\n")
-
-  F_matrix <- x$F_matrix
-  matriz_rasgos <- as.data.frame(x$traits)
-  sites <- names(x$rDelta_C)
-
-  # Quedarnos solo con las columnas numéricas para el CWM y Correlación
-  is_num <- sapply(matriz_rasgos, is.numeric)
-  mat_num <- matriz_rasgos[, is_num, drop = FALSE]
-
-  results_list <- list()
-
-  for (sitio in sites) {
-    eje_critico <- x$critical_axes[sitio]
-
-    abund_antes <- as.numeric(x$rel_ref[sitio, ])
-    names(abund_antes) <- colnames(x$rel_ref)
-    abund_desp  <- as.numeric(x$rel_comp[sitio, ])
-    names(abund_desp) <- colnames(x$rel_comp)
-
-    coords_eje <- F_matrix[, eje_critico]
-
-    # 1. Identificar la importancia del rasgo usando Correlación de Pearson
-    correlaciones <- numeric(ncol(mat_num))
-    names(correlaciones) <- colnames(mat_num)
-    for(i in 1:ncol(mat_num)) {
-      if(sd(mat_num[, i], na.rm = TRUE) > 0) {
-        correlaciones[i] <- abs(stats::cor(mat_num[, i], coords_eje, use = "pairwise.complete.obs"))
-      } else {
-        correlaciones[i] <- 0
-      }
-    }
-
-    top_rasgos <- names(sort(correlaciones, decreasing = TRUE)[1:top_n])
-
-    rasgos_aum <- c()
-    rasgos_dis <- c()
-    traits_summary <- list()
-
-    # Matriz indicadora temporal para agrupar ganadoras/perdedoras
-    mat_ind <- matrix(0, nrow = nrow(mat_num), ncol = length(top_rasgos))
-    rownames(mat_ind) <- rownames(mat_num)
-    colnames(mat_ind) <- top_rasgos
-
-    for (rasgo in top_rasgos) {
-      rasgo_vals <- mat_num[, rasgo]
-      is_binary <- all(rasgo_vals %in% c(0, 1, NA))
-
-      # 2. Calcular la Media Ponderada de la Comunidad (CWM)
-      cwm_antes <- sum(abund_antes * rasgo_vals, na.rm = TRUE)
-      cwm_desp  <- sum(abund_desp * rasgo_vals, na.rm = TRUE)
-      cambio <- cwm_desp - cwm_antes
-
-      # 3. Identificar quién "posee" el rasgo conductor
-      if(is_binary) {
-        spp_con_rasgo <- rownames(mat_num)[rasgo_vals == 1 & !is.na(rasgo_vals)]
-      } else {
-        spp_con_rasgo <- rownames(mat_num)[rasgo_vals > mean(rasgo_vals, na.rm = TRUE) & !is.na(rasgo_vals)]
-      }
-
-      mat_ind[spp_con_rasgo, rasgo] <- 1
-
-      traits_summary[[rasgo]] <- data.frame(Antes = cwm_antes, Despues = cwm_desp,
-                                            Dif = cambio, is_binary = is_binary)
-
-      if (cambio > 0) { rasgos_aum <- c(rasgos_aum, rasgo) }
-      else { rasgos_dis <- c(rasgos_dis, rasgo) }
-    }
-
-    spp_win_strict <- list(); spp_win_partial <- list()
-    spp_lose_strict <- list(); spp_lose_partial <- list()
-
-    if (length(rasgos_aum) > 0) {
-      mat_aum <- mat_ind[, rasgos_aum, drop = FALSE]
-      sums_aum <- rowSums(mat_aum)
-      for (sp in rownames(mat_aum)) {
-        if (abund_desp[sp] > abund_antes[sp]) {
-          if (sums_aum[sp] == length(rasgos_aum)) {
-            spp_win_strict[[sp]] <- data.frame(Antes = abund_antes[sp], Despues = abund_desp[sp])
-          } else if (sums_aum[sp] >= 1) {
-            spp_win_partial[[sp]] <- data.frame(Antes = abund_antes[sp], Despues = abund_desp[sp])
-          }
-        }
-      }
-    }
-
-    if (length(rasgos_dis) > 0) {
-      mat_dis <- mat_ind[, rasgos_dis, drop = FALSE]
-      sums_dis <- rowSums(mat_dis)
-      for (sp in rownames(mat_dis)) {
-        if (abund_desp[sp] < abund_antes[sp]) {
-          if (sums_dis[sp] == length(rasgos_dis)) {
-            spp_lose_strict[[sp]] <- data.frame(Antes = abund_antes[sp], Despues = abund_desp[sp])
-          } else if (sums_dis[sp] >= 1) {
-            spp_lose_partial[[sp]] <- data.frame(Antes = abund_antes[sp], Despues = abund_desp[sp])
-          }
-        }
-      }
-    }
-
-    results_list[[sitio]] <- list(
-      critical_axis = eje_critico,
-      traits_evaluated = traits_summary,
-      win_strict = spp_win_strict,
-      win_partial = spp_win_partial,
-      lose_strict = spp_lose_strict,
-      lose_partial = spp_lose_partial
-    )
+asc_transitions <- function(x, ...) {
+  if (!inherits(x, c("ascfcd", "ascfcd_pw"))) {
+    stop("Input must be of class 'ascfcd' or 'ascfcd_pw'.")
   }
 
-  class(results_list) <- c("asc_trans", "list")
-  return(results_list)
-}
+  F_mat <- x$F_space
+  entities <- names(x$directional_vectors)
+  res_list <- list()
 
-#' @export
-asc_transitions.ascfcd_pw <- function(x, top_n = 3) {
-  cat("\nExtracting functional transitions for pairwise network links...\n")
+  for (s in entities) {
+    v_dir <- x$directional_vectors[[s]]
+    mag_v <- sqrt(sum(v_dir^2))
 
-  F_matrix <- x$F_matrix
-  matriz_rasgos <- as.data.frame(x$traits)
-  df_res <- x$pairwise_results
+    # Extraemos la demografía
+    p_r <- as.numeric(x$p_ref[[s]])
+    p_c <- as.numeric(x$p_comp[[s]])
+    delta_p <- p_c - p_r
 
-  is_num <- sapply(matriz_rasgos, is.numeric)
-  mat_num <- matriz_rasgos[, is_num, drop = FALSE]
+    if (mag_v == 0) {
+      # Si no hay desplazamiento, el leverage es nulo
+      df_lev <- data.frame(Species = rownames(F_mat), Delta_p = delta_p, Projection = 0, Leverage = 0)
+    } else {
+      # Vector unitario direccional
+      u_dir <- v_dir / mag_v
 
-  results_list <- list()
-
-  for (i in 1:nrow(df_res)) {
-    s1 <- df_res$Community_A[i]
-    s2 <- df_res$Community_B[i]
-    link_name <- paste(s1, "vs", s2)
-
-    eje_critico <- df_res$Critical_Axis[i]
-
-    abund_antes <- as.numeric(x$rel_abund[s1, ])
-    names(abund_antes) <- colnames(x$rel_abund)
-    abund_desp  <- as.numeric(x$rel_abund[s2, ])
-    names(abund_desp) <- colnames(x$rel_abund)
-
-    coords_eje <- F_matrix[, eje_critico]
-
-    correlaciones <- numeric(ncol(mat_num))
-    names(correlaciones) <- colnames(mat_num)
-    for(j in 1:ncol(mat_num)) {
-      if(sd(mat_num[, j], na.rm = TRUE) > 0) {
-        correlaciones[j] <- abs(stats::cor(mat_num[, j], coords_eje, use = "pairwise.complete.obs"))
+      # Ubicamos el centroide de origen según el tipo de objeto
+      if (inherits(x, "ascfcd")) {
+        c_base <- as.numeric(x$cwm_ref[[s]])
       } else {
-        correlaciones[j] <- 0
-      }
-    }
-
-    top_rasgos <- names(sort(correlaciones, decreasing = TRUE)[1:top_n])
-
-    rasgos_aum <- c()
-    rasgos_dis <- c()
-    traits_summary <- list()
-
-    mat_ind <- matrix(0, nrow = nrow(mat_num), ncol = length(top_rasgos))
-    rownames(mat_ind) <- rownames(mat_num)
-    colnames(mat_ind) <- top_rasgos
-
-    for (rasgo in top_rasgos) {
-      rasgo_vals <- mat_num[, rasgo]
-      is_binary <- all(rasgo_vals %in% c(0, 1, NA))
-
-      cwm_antes <- sum(abund_antes * rasgo_vals, na.rm = TRUE)
-      cwm_desp  <- sum(abund_desp * rasgo_vals, na.rm = TRUE)
-      cambio <- cwm_desp - cwm_antes
-
-      if(is_binary) {
-        spp_con_rasgo <- rownames(mat_num)[rasgo_vals == 1 & !is.na(rasgo_vals)]
-      } else {
-        spp_con_rasgo <- rownames(mat_num)[rasgo_vals > mean(rasgo_vals, na.rm = TRUE) & !is.na(rasgo_vals)]
+        com_A <- strsplit(s, "_vs_")[[1]][1]
+        c_base <- as.numeric(x$cwm_global[com_A, ])
       }
 
-      mat_ind[spp_con_rasgo, rasgo] <- 1
-
-      traits_summary[[rasgo]] <- data.frame(Antes = cwm_antes, Despues = cwm_desp,
-                                            Dif = cambio, is_binary = is_binary)
-
-      if (cambio > 0) { rasgos_aum <- c(rasgos_aum, rasgo) }
-      else { rasgos_dis <- c(rasgos_dis, rasgo) }
-    }
-
-    spp_win_strict <- list(); spp_win_partial <- list()
-    spp_lose_strict <- list(); spp_lose_partial <- list()
-
-    if (length(rasgos_aum) > 0) {
-      mat_aum <- mat_ind[, rasgos_aum, drop = FALSE]
-      sums_aum <- rowSums(mat_aum)
-      for (sp in rownames(mat_aum)) {
-        if (abund_desp[sp] > abund_antes[sp]) {
-          if (sums_aum[sp] == length(rasgos_aum)) {
-            spp_win_strict[[sp]] <- data.frame(Antes = abund_antes[sp], Despues = abund_desp[sp])
-          } else if (sums_aum[sp] >= 1) {
-            spp_win_partial[[sp]] <- data.frame(Antes = abund_antes[sp], Despues = abund_desp[sp])
-          }
-        }
+      # Proyección ortogonal de cada especie sobre el vector direccional
+      projections <- numeric(nrow(F_mat))
+      for (i in seq_len(nrow(F_mat))) {
+        projections[i] <- sum((F_mat[i, ] - c_base) * u_dir)
       }
+
+      # Cálculo del Leverage Multidimensional
+      leverage <- delta_p * projections
+
+      df_lev <- data.frame(
+        Species = rownames(F_mat),
+        Delta_p = round(delta_p, 4),
+        Projection = round(projections, 4),
+        Leverage = round(leverage, 4)
+      )
     }
 
-    if (length(rasgos_dis) > 0) {
-      mat_dis <- mat_ind[, rasgos_dis, drop = FALSE]
-      sums_dis <- rowSums(mat_dis)
-      for (sp in rownames(mat_dis)) {
-        if (abund_desp[sp] < abund_antes[sp]) {
-          if (sums_dis[sp] == length(rasgos_dis)) {
-            spp_lose_strict[[sp]] <- data.frame(Antes = abund_antes[sp], Despues = abund_desp[sp])
-          } else if (sums_dis[sp] >= 1) {
-            spp_lose_partial[[sp]] <- data.frame(Antes = abund_antes[sp], Despues = abund_desp[sp])
-          }
-        }
-      }
-    }
+    # Ordenamos por impacto absoluto (los mayores drivers arriba)
+    df_lev <- df_lev[order(abs(df_lev$Leverage), decreasing = TRUE), ]
+    rownames(df_lev) <- NULL
 
-    results_list[[link_name]] <- list(
-      critical_axis = eje_critico,
-      traits_evaluated = traits_summary,
-      win_strict = spp_win_strict,
-      win_partial = spp_win_partial,
-      lose_strict = spp_lose_strict,
-      lose_partial = spp_lose_partial
-    )
+    res_list[[s]] <- list(species_leverage = df_lev)
   }
 
-  class(results_list) <- c("asc_trans", "list")
-  return(results_list)
+  return(res_list)
 }

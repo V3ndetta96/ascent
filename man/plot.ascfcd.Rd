@@ -2,23 +2,25 @@
 % Please edit documentation in R/plot.R
 \name{plot.ascfcd}
 \alias{plot.ascfcd}
-\title{Plot ASC-FCD Paired Contrast}
+\title{Plot Multidimensional Functional Restructuring}
 \usage{
-\method{plot}{ascfcd}(x, contrast, ...)
+\method{plot}{ascfcd}(x, contrast, type = c("both", "pcoa", "leverage"), n_sp = 10, ...)
 }
 \arguments{
 \item{x}{An object of class \code{ascfcd}.}
 
-\item{contrast}{Character string specifying which site/community contrast to plot.}
+\item{contrast}{Character. The exact name of the site/contrast to plot.}
 
-\item{...}{Further arguments passed to or from other methods.}
+\item{type}{Character. What to plot? \code{"pcoa"} (Trajectory & Hull), \code{"leverage"} (Drivers), or \code{"both"}. Default is \code{"both"}.}
+
+\item{n_sp}{Integer. Number of top species to display in the leverage plot. Default is 10.}
+
+\item{...}{Additional graphical arguments.}
 }
 \value{
-A \code{patchwork} object containing the combined ggplot2 figures.
+A ggplot object (or patchwork object if \code{type = "both"}).
 }
 \description{
-Generates a publication-ready, 2-panel figure for a specific paired contrast.
-The left panel shows the multidimensional functional space and the centroid trajectory.
-The right panel displays the Axis-Specific Contribution (ASC) barplot, highlighting
-the critical dimension of environmental change.
+Visualizes the functional trajectory (Centroid shift) and volume shift (Convex Hull)
+of a specific site/contrast in the PCoA space, alongside the species leverage.
 }
