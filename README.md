@@ -27,7 +27,7 @@ You can install the development version of `ascent` from GitHub with:
 
 ```r
 # install.packages("devtools")
-devtools::install_github("tu-usuario/ascent")
+devtools::install_github("V3ndetta96/ascent")
 
 💻 Quick Start
 Here is a basic workflow evaluating the functional impact of deforestation on a bird community using mixed trait data (quantitative and binary).
