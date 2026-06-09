@@ -1,12 +1,7 @@
 # ascent: A multi-layer framework for decomposing functional community restructuring into positional, dispersive and boundary components under hierarchical null models.
 
-<<<<<<< HEAD
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20388186.svg)](https://doi.org/10.5281/zenodo.20388186)
 The **`ascent`** package implements the **ASC-CFD** (Asymmetric Shift and Community Functional Dynamics) framework.
-=======
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20480767.svg)](https://doi.org/10.5281/zenodo.20480767)
-The **`ascent`** package implements the **ASC-FCD** (Asymmetric Shift in Centroid - Functional Centroid Displacement) framework.
->>>>>>> 18f7818362f03c9c923df77d58a0c881ff20d4ee
 
 Most functional diversity metrics quantify how much communities differ,
 but provide little information about how those differences are organized
