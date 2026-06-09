@@ -241,3 +241,24 @@ plot.ascfcd_pw <- function(x, contrast, type = c("both", "pcoa", "leverage"), n_
   if (!requireNamespace("patchwork", quietly = TRUE)) return(p_pca)
   return(p_pca | p_lev)
 }
+
+#' Plot Functional Entities Dendrogram
+#'
+#' @description
+#' Plots the hierarchical clustering dendrogram of the functional entities.
+#'
+#' @param x An object of class \code{ascfcd_entities}.
+#' @param ... Additional graphical arguments passed to \code{plot.hclust}.
+#'
+#' @export
+plot.ascfcd_entities <- function(x, ...) {
+  plot(x$hclust_obj, main = "Functional Entities Dendrogram",
+       xlab = "Species", ylab = paste(tools::toTitleCase(x$metric), "Distance"),
+       sub = paste("Method:", x$method), cex = 0.8, ...)
+
+  # Si el usuario definió un número específico de clusters, dibujamos los rectángulos
+  n_clusters <- length(unique(x$entity_classification$Entity_ID))
+  if(n_clusters > 1) {
+    stats::rect.hclust(x$hclust_obj, k = n_clusters, border = "red")
+  }
+}

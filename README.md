@@ -1,25 +1,64 @@
 # ascent: A multi-layer framework for decomposing functional community restructuring into positional, dispersive and boundary components under hierarchical null models.
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20388186.svg)](https://doi.org/10.5281/zenodo.20388186)
-The **`ascent`** package implements the **ASC-FCD** (Asymmetric Shift in Centroid - Functional Centroid Displacement) framework.
+The **`ascent`** package implements the **ASC-CFD** (Asymmetric Shift and Community Functional Dynamics) framework.
 
-Traditional functional ecology metrics often compress community dynamics into isolated indices, obscuring the underlying mechanisms of change. `ascent` provides a multi-layer topological approach to **decompose functional community restructuring into positional, dispersive, and boundary components under hierarchical null models.**
+Most functional diversity metrics quantify how much communities differ,
+but provide little information about how those differences are organized
+within functional space.
 
-Whether you are evaluating temporal perturbations (e.g., deforestation, climate change) or spatial beta-diversity gradients, `ascent` allows you to track the exact geometric trajectory of ecosystems and identify the specific taxa driving these shifts.
+Communities may exhibit identical levels of functional turnover while
+following completely different ecological trajectories, including
+directional shifts, internal reorganization, or expansion and contraction
+of functional boundaries.
+
+The `ascent` package implements the ASC-CFD framework to explicitly
+decompose these processes. 
+
+`ascent` provides a multi-layer topological approach to **decompose functional community restructuring into positional, dispersive, and boundary components under hierarchical null models.**
+
+Whether you are evaluating temporal perturbations (e.g., deforestation, climate change) or spatial beta-diversity gradients, `ascent` allows you to reconstruct the geometric trajectory of ecosystems and identify the specific taxa driving these shifts.
 
 ## 🧠 Core Architecture
 
-The framework evaluates ecological dynamics by deconstructing them into three orthogonal geometric layers within the functional hyperspace:
+The framework evaluates ecological dynamics by deconstructing them into three analytically distinct geometric layers within the retained functional space:
 
-1. **Positional Component ($\Delta C$):** The net directional displacement of the community centroid. Measures the fundamental shift in the ecosystem's functional equilibrium.
+1. **Positional Component ($\Delta C$):** The net directional displacement of the community centroid. Measures the displacement of the community functional centroid within the retained trait space.
 2. **Dispersive Component ($\Delta FDis$):** The internal demographic reorganization. Quantifies whether biomass is concentrating into central redundant strategies or expanding towards peripheral phenotypes.
-3. **Boundary Component ($\Delta FRic$):** The multidimensional Convex Hull volume. Captures the strict colonization of novel functional space or the extinction of extreme phenotypes.
+3. **Boundary Component ($\Delta FRic$):** The multidimensional Convex Hull volume. Captures changes in the outer functional boundaries of communities through Convex Hull geometry. Because this metric depends exclusively on extreme species, it should be interpreted as a topological descriptor rather than a robust abundance-weighted estimate of functional change.
+
+What does each layer measure?
+
+ΔC     → Where is the community moving?
+ΔFDis  → How is biomass being redistributed?
+ΔFRic  → Are functional boundaries expanding or collapsing?
 
 ### The Triad of Null Models
-To isolate deterministic environmental filtering from stochastic noise, shifts are evaluated against a hierarchy of null models:
-* **Structural Filter (Incidence/Curveball):** Does the taxonomic turnover alter the topology more than expected by chance?
-* **Quantitative Filter (Demographic/SAD):** Is the internal biomass redirection deterministic?
-* **Identity Filter (Trait Shuffle):** Given the observed richness and abundances, are the selected functional strategies significantly different from a random draw of the regional pool?
+Rather than relying on a single null expectation, ascent implements a hierarchical inferential framework that sequentially isolates:
+* **Structural Turnover (Incidence/Curveball):** Does the taxonomic turnover alter the topology more than expected by chance?
+* **Demographic reorganization (Quantitative Filter - Demographic/SAD):** Is the internal biomass redirection deterministic?
+* **Functional identity effects (Identity Filter - Trait Shuffle):** Given the observed richness and abundances, are the selected functional strategies significantly different from a random draw of the regional pool?
+
+### Species-level Functional Leverage
+
+The asc_transitions() module projects species-specific abundance changes onto the observed ecosystem trajectory, identifying the taxa responsible for driving functional restructuring.
+This allows users to move beyond community-level metrics and directly quantify the contribution of individual species to directional ecosystem change.
+
+### Why not just use Functional Beta Diversity?
+
+Current frameworks quantify the magnitude of functional turnover between communities.
+ascent instead decomposes restructuring into three distinct mechanisms:
+
+| Question                                          | Classical beta diversity | ascent |
+| ------------------------------------------------- | ------------------------ | ------ |
+| How much changed?                                 | ✓                        | ✓      |
+| In which direction did it change?                 | ✗                        | ✓      |
+| Did the centroid move?                            | ✗                        | ✓      |
+| Did internal functional dispersion change?        | ✗                        | ✓      |
+| Did the functional boundaries expand or collapse? | ✗                        | ✓      |
+| Which species drove the shift?                    | ✗                        | ✓      |
+
+
 
 ## 🚀 Installation
 
@@ -27,7 +66,7 @@ You can install the development version of `ascent` from GitHub with:
 
 ```r
 # install.packages("devtools")
-devtools::install_github("tu-usuario/ascent")
+devtools::install_github("V3ndetta96/ascent")
 
 💻 Quick Start
 Here is a basic workflow evaluating the functional impact of deforestation on a bird community using mixed trait data (quantitative and binary).

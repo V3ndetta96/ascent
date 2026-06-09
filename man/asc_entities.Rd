@@ -2,34 +2,31 @@
 % Please edit documentation in R/asc_entities.R
 \name{asc_entities}
 \alias{asc_entities}
-\title{Baseline Functional Topology of Entities}
+\title{Identify Functional Entities (Species Clustering)}
 \usage{
 asc_entities(
   traits,
-  abund,
   dist_method = "gower",
-  dim_retention = c("variance", "broken_stick"),
-  var_tol = 0.8,
-  na.rm = TRUE
+  hclust_method = "ward.D2",
+  k = NULL,
+  h = NULL
 )
 }
 \arguments{
 \item{traits}{A data frame or matrix of functional traits.}
 
-\item{abund}{A data frame or matrix of species abundances.}
+\item{dist_method}{Character. Distance metric. Default is \code{"gower"} to handle mixed data types.}
 
-\item{dist_method}{Distance metric for the trait matrix. Default is "gower".}
+\item{hclust_method}{Character. Agglomeration method for hierarchical clustering. Default is \code{"ward.D2"}.}
 
-\item{dim_retention}{Character. Method for dimensionality reduction. Options are \code{"variance"} or \code{"broken_stick"}.}
+\item{k}{Integer. Desired number of functional entities (clusters). If \code{NULL}, \code{h} must be provided.}
 
-\item{var_tol}{Numeric. Proportion of cumulative variance to retain. Default is 0.80.}
-
-\item{na.rm}{Logical. Remove missing values? Default is TRUE.}
+\item{h}{Numeric. Height at which to cut the dendrogram. If both \code{k} and \code{h} are \code{NULL}, defaults to \code{k = 3}.}
 }
 \value{
-An S3 object of class \code{ascfcd_ent}.
+An S3 object of class \code{ascfcd_entities}.
 }
 \description{
-Calculates the absolute functional centroid (CWM), functional dispersion (FDis),
-and convex hull volume (FRic) for each community or site independently.
+Clusters species into discrete functional entities based on shared
+morphological, physiological, or ecological traits.
 }

@@ -1,6 +1,6 @@
 ---
 title: "ascent: A multi-layer framework for decomposing functional community restructuring into positional, dispersive and boundary components under hierarchical null models."
-author: "Rogelio R. Muñoz-Li"
+author: "Rogelio R. Muñoz-Li & Flavia Alvarez-Denis"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
@@ -9,130 +9,162 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include = FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
   warning = FALSE,
   message = FALSE,
-  fig.width = 10, 
+  fig.width = 10,
   fig.height = 5.5
 )
 ```
 
-## Introduction
+## Part I - Conceptual Framework
 
-The `ascent` package implements the **ASC-FCD** (A multi-layer framework for decomposing functional community restructuring into positional, dispersive and boundary components under hierarchical null models.) framework. It provides a multi-layer approach to decompose functional community restructuring into three orthogonal geometric components:
+The `ascent` package implements the **ASC-CFD** (Asymmetric Shift and Community Functional Dynamics) framework. Communities can exhibit identical levels of functional turnover while following fundamentally different ecological trajectories. One community may experience a directional shift in its functional equilibrium, another may simply reorganize biomass internally, and a third may expand into previously unoccupied regions of trait space. Traditional metrics often collapse these distinct processes into a single value. `ascent` instead uses a multi-layer topological approach to decompose community restructuring into three orthogonal geometric components:
 
-1. **Positional Shift ($\Delta C$):** The net directional displacement of the community centroid.
+1. **Positional Shift ($r\Delta C_{\%}$):** The net directional displacement of the community centroid.
 2. **Dispersive Shift ($\Delta FDis$):** The internal demographic reorganization (expansion or contraction of niche variance).
-3. **Boundary Shift ($\Delta FRic$):** The expansion or collapse of extreme functional phenotypes (Convex Hull volume).
+3. **Boundary Shift ($\Delta FRic$):** The multidimensional Convex Hull volume (expansion or collapse of extreme phenotypes).
 
-To isolate deterministic environmental filtering from stochastic noise, `ascent` evaluates these shifts against a hierarchical triad of null models: Structural (Incidence), Quantitative (Demographic), and Identity (Trait Shuffle).
 
-## 1. Simulating an Avian Metacommunity
+**Table 1**. Functional diversity metrics used in ASC-CFD frameworks.
 
-We will simulate a bird community containing mixed data types: quantitative traits (body mass, beak length) and binary traits (diet, habitat specialization). 
+| Layer      | Metric | Ecological Question                                |
+| ---------- | ------ | -------------------------------------------------- |
+| Position   | ΔC     | Where is the community moving?                     |
+| Dispersion | ΔFDis  | How is biomass being redistributed?                |
+| Boundary   | ΔFRic  | Are functional boundaries expanding or collapsing? |
 
-We will define two abundance matrices: one to evaluate a **temporal perturbation** (deforestation) and one to evaluate a **spatial gradient** (Primary Forest $\rightarrow$ Secondary Forest $\rightarrow$ Agriculture).
 
-```{r setup}
+To isolate deterministic environmental filtering from stochastic noise, `ascent` triggers a hierarchical triad of null models: **Structural** (Incidence), **Quantitative** (Demographic), and **Identity** (Trait Shuffle).
+
+### Simulating an Avian Metacommunity
+We simulate a bird community experiencing habitat degradation. Functional matrices often contain mixed data types. Here, we combine quantitative traits (body mass, beak length) and binary traits (diet, habitat specialization). Binary traits MUST be encoded as `factor` to correctly apply the **Gower** distance metric.
+
+```{r data_simulation}
 library(ascent)
 
-# 1. Functional Trait Space (10 Bird Species)
-# Binary traits must be factors so the Gower metric processes them correctly.
+# 1. Functional Trait Space
 set.seed(42)
 aves_traits <- data.frame(
-  Body_Mass   = c(15, 20, 30, 45, 60, 90, 150, 250, 400, 600), # Quantitative (g)
-  Beak_Length = c(10, 12, 15, 22, 28, 35,  45,  60,  85, 120), # Quantitative (mm)
-  Frugivore   = factor(c(0, 0, 1, 1, 1, 0,  1,  1,  1,  0)),   # Binary (0/1)
-  Forest_Dep  = factor(c(0, 0, 0, 0, 1, 1,  1,  1,  1,  1))    # Binary (0/1)
+  Body_Mass   = c(15, 20, 30, 45, 60, 90, 150, 250, 400, 600),
+  Beak_Length = c(10, 12, 15, 22, 28, 35,  45,  60,  85, 120),
+  Frugivore   = factor(c(0, 0, 1, 1, 1, 0,  1,  1,  1,  0)),
+  Forest_Dep  = factor(c(0, 0, 0, 0, 1, 1,  1,  1,  1,  1))
 )
 rownames(aves_traits) <- paste0("Av_sp", 1:10)
 
-# 2a. Temporal Matrix (Deforestation favors tiny birds)
+# 2a. Temporal Matrix (Deforestation)
 abund_time <- rbind(
-  Site1_Ref = c( 0,  0, 10, 15, 25, 20, 10, 8, 4, 2),
-  Site1_Imp = c(40, 35, 15,  5,  0,  0,  0, 0, 0, 0)
+  Site1_Ref = c( 0,  0, 10, 15, 25, 20, 10, 8, 4, 2), # Mature forest
+  Site1_Imp = c(40, 35, 15,  5,  0,  0,  0, 0, 0, 0)  # Logged area
 )
-sitios <- c("Site1", "Site1")
-tiempos <- c("Reference", "Impacted")
 
-# 2b. Spatial Matrix (Agriculture favors mid-sized opportunistic birds)
+# 2b. Spatial Matrix (Landscape Gradient)
 abund_space <- rbind(
   Primary   = c( 0,  0,  5, 10, 20, 25, 15, 10, 5, 2),
   Secondary = c( 0,  5, 10, 20, 35, 20, 10,  0, 0, 0),
-  Agri      = c( 0,  0,  0,  5, 45, 45,  5,  0, 0, 0) # Foco demográfico en Sp5 y Sp6
+  Agri      = c( 0,  0,  0,  5, 45, 45,  5,  0, 0, 0)
 )
 ```
 
 ---
 
-## Part I: Baseline Functional Entities (`asc_entities`)
+## Part II - Temporal Restructuring
 
-Before comparing communities, we extract the absolute functional topology (baseline CWM, FDis, and FRic) of our spatial sites. Because we have mixed data, we set `dist_method = "gower"`.
+We start with the core engine: evaluating the functional restructuring driven by deforestation in Site 1 using `asc_paired()`. We simultaneously trigger the triad of null models using `asc_null()`. *(Note: `n_perm = 99` is used for CRAN vignette compilation speed. Use 999 or 9999 for research).*
 
-```{r entities}
-# Evaluate isolated entities
-base_topo <- asc_entities(traits = aves_traits, abund = abund_space, dist_method = "gower")
-summary(base_topo)
-```
-
-*Observation:* The `Primary` forest supports a massive functional volume (FRic) and high dispersion, while the `Agri` matrix is functionally poor and highly clustered around generalist traits.
-
----
-
-## Part II: Temporal Functional Shifts (`asc_paired` & `asc_transitions`)
-
-We will calculate the functional restructuring driven by deforestation in Site 1, triggering the triad of null models. *(Note: We use `n_perm = 99` for CRAN vignette compilation speed. Use 999 or 9999 for robust research).*
-
-```{r paired}
-# Execute the paired multi-layer framework
+```{r temporal_shift}
 res_paired <- asc_paired(
-  traits = aves_traits, abund = abund_time, sites = sitios, time = tiempos,
+  traits = aves_traits, abund = abund_time, 
+  sites = c("Site1", "Site1"), time = c("Reference", "Impacted"),
   ref_time = "Reference", dist_method = "gower"
 )
 res_paired <- asc_null(res_paired, n_perm = 99, seed = 123)
 summary(res_paired)
 ```
 
-### Visualizing Dynamics and Extracting Leverage
-
-The `plot()` method projects the dynamic trajectory and the Convex Hulls. To understand *who* is driving this topological shift, we use `asc_transitions()`.
-
-```{r paired_plot}
-# Plot Trajectory (Layer 1 & 3) alongside the Leverage drivers
-plot(res_paired, contrast = "Site1", type = "both", n_sp = 5)
-
-# Extract full numerical leverage data
-drivers_time <- asc_transitions(res_paired)
-head(drivers_time$Site1$species_leverage, 4)
-```
-
-*Ecological meaning:* `Av_sp1` (positive leverage) actively pulled the ecosystem towards the degraded state, while `Av_sp7` (negative leverage) was a forest specialist whose extinction "released" the centroid from its mature equilibrium.
+**Ecological Interpretation:** The community experienced a displacement of the functional centroid (42.42% of the regional functional diameter), while changes in dispersion and volume were small and consistent with random expectations. The only component that exceeded the null models was position under the identity filter, indicating that the observed restructuring was associated with a non-random selection of combinations of functional traits. Consequently, the results suggest a directional functional filtering process without evidence of significant contraction of the functional niche or internal reorganization of biomass.
 
 ---
 
-## Part III: Spatial Functional Networks (`asc_pairwise`)
+## Part III - Species Leverage
 
-For landscape or beta-diversity studies, `ascent` computes the bidirectional spatial divergence between all possible community pairs.
+To dissect the biological drivers behind this geometric shift, we extract the **Functional Leverage**. This algorithm projects the multidimensional demographic shift ($\Delta p_i$) of each species onto the unit directional vector of the ecosystem.
 
-```{r pairwise}
-# Execute spatial network framework
+```{r leverage}
+# Extract the specific topological drivers
+drivers_time <- asc_transitions(res_paired)
+head(drivers_time$Site1$species_leverage, 4)
+
+# Plot the PCoA trajectory and the leverage divergence
+plot(res_paired, contrast = "Site1", type = "both", n_sp = 5)
+```
+
+**Ecological Interpretation:** Species Av_sp1 (small, open-area generalist) exhibited the highest positive leverage, indicating that its demographic expansion strongly pulled the community centroid toward the degraded state. In contrast, Av_sp6 showed negative leverage because it declined despite occupying a position aligned with the direction of change, partially opposing the overall displacement. Conversely, the decline of Av_sp5 generated a small positive leverage effect by removing biomass from a region of trait space located opposite to the observed trajectory, thereby facilitating the centroid shift.
+
+---
+
+## Part IV - Spatial Networks
+
+For landscape ecology or beta-diversity studies, `ascent` computes the bidirectional spatial divergence between all possible community pairs using `asc_pairwise()`.
+
+```{r spatial_network}
 res_pw <- asc_pairwise(traits = aves_traits, abund = abund_space, dist_method = "gower")
 res_pw <- asc_null(res_pw, n_perm = 99, seed = 42)
-
-# Summarize the entire spatial functional network
 summary(res_pw)
+
+# Visualize the functional gap between Primary and Secondary Forest
+plot(res_pw, contrast = "Primary_vs_Secondary", type = "both", n_sp = 5)
+
+# Visualize the severe functional gap between Secondary Forest and Agriculture
+plot(res_pw, contrast = "Secondary_vs_Agri", type = "both", n_sp = 5)
 ```
 
-### Visualizing Spatial Divergence
+**Ecological Interpretation:** The spatial analysis revealed relatively small functional differences among communities. None of the observed shifts exceeded the expectations generated by the hierarchical null models, suggesting that the apparent variation among habitats can be explained by stochastic fluctuations in species composition and abundance. In this simulated example, agricultural intensification produced only modest changes in community topology, resulting in limited displacement of the functional centroid and minor reductions in functional volume. This example illustrates how ASC-CFD can distinguish between apparent community differences and statistically supported functional restructuring. Although the communities differ in composition, none of the observed topological shifts were stronger than expected under the null models, indicating weak evidence for deterministic functional filtering.
 
-We can plot specific spatial links within the network. Let's visualize the massive functional gap between the `Primary` forest and the `Agri` matrix.
+---
 
-```{r pairwise_plot}
-# Plot spatial topological divergence
-plot(res_pw, contrast = "Primary_vs_Agri", type = "both", n_sp = 5)
+## Part V - Baseline Topology
+
+Sometimes, a researcher only needs to report the absolute structural metrics of isolated communities without computing directional networks. `asc_baseline()` calculates the absolute functional topology of isolated communities.
+
+```{r baseline}
+base_topo <- asc_baseline(traits = aves_traits, abund = abund_space, dist_method = "gower")
+summary(base_topo)
 ```
 
-The resulting spatial topology clearly demonstrates that agricultural intensification does not simply result in species loss, but forces a deterministic collapse and complete directional displacement of the multidimensional functional niche.
+The baseline metrics reveal a gradual reduction in both functional richness and functional dispersion from `Primary` forest to `Agri` habitat, indicating that agricultural communities occupy a somewhat smaller and less dispersed region of the functional space.
+
+---
+
+## Part VI - Functional Entities
+
+As a supplementary utility, the package provides `asc_entities()`, an algorithm that clusters the regional species pool into discrete functional entities based on morphological and ecological trait distances, regardless of spatial abundance.
+
+```{r entities, fig.width=7, fig.height=5}
+# Cluster the species into 3 functional entities using Gower distance
+func_ent <- asc_entities(traits = aves_traits, dist_method = "gower", k = 3)
+summary(func_ent)
+
+# Visualize the functional dendrogram
+plot(func_ent)
+```
+
+This classification helps researchers map continuous traits into discrete ecological guilds prior to mapping community-level dynamics.
+
+**Choosing the Appropriate Function**
+
+**Table 2**. Functions included in `ascent` package and its purposes.
+
+| Objective              | Function            |
+| ---------------------- | ------------------- |
+| Temporal restructuring | `asc_paired()`      |
+| Spatial divergence     | `asc_pairwise()`    |
+| Species drivers        | `asc_transitions()` |
+| Baseline topology      | `asc_baseline()`    |
+| Functional entities    | `asc_entities()`    |
+| Null model inference   | `asc_null()`        |
+

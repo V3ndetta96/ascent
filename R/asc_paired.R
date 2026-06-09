@@ -71,8 +71,8 @@ asc_paired <- function(traits, abund, sites, time, ref_time, dist_method = "gowe
   }
 
   cwm_global <- abund_rel %*% F_mat
-  Dmax_empirical <- max(stats::dist(cwm_global))
-  if(Dmax_empirical == 0) Dmax_empirical <- 1
+  Dmax_regional <- max(stats::dist(F_mat))
+  if(Dmax_regional == 0) Dmax_regional <- 1
 
   unique_sites <- unique(sites)
   res_list <- list()
@@ -101,7 +101,7 @@ asc_paired <- function(traits, abund, sites, time, ref_time, dist_method = "gowe
     v_dir <- cwm_comp - cwm_ref
     directional_vectors[[s]] <- v_dir
     dist_abs <- sqrt(sum(v_dir^2))
-    rDelta_C[s] <- (dist_abs / Dmax_empirical) * 100
+    rDelta_C[s] <- (dist_abs / Dmax_regional) * 100
 
     topo_ref <- calc_topology(as.numeric(p_ref_mat), F_mat)
     topo_comp <- calc_topology(as.numeric(p_comp_mat), F_mat)
@@ -118,7 +118,7 @@ asc_paired <- function(traits, abund, sites, time, ref_time, dist_method = "gowe
   valid_sites <- !is.na(rDelta_C)
   output <- list(
     rDelta_C = rDelta_C[valid_sites],
-    Dmax_empirical = Dmax_empirical,
+    Dmax_regional = Dmax_regional,
     directional_vectors = directional_vectors,
     p_ref = p_ref_list, p_comp = p_comp_list,
     cwm_ref = cwm_ref_list, cwm_comp = cwm_comp_list,

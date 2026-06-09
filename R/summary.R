@@ -125,7 +125,7 @@ summary.ascfcd_pw <- function(object, ...) {
 #'
 #' @return Invisibly returns the entities results data frame.
 #' @export
-summary.ascfcd_ent <- function(object, ...) {
+summary.ascfcd_base <- function(object, ...) {
   cat("==================================================\n")
   cat(" ASC-FCD: Baseline Functional Topology \n")
   cat("==================================================\n\n")
@@ -145,4 +145,40 @@ summary.ascfcd_ent <- function(object, ...) {
   cat("\n")
 
   invisible(object$entities_results)
+}
+
+#' Summary for Functional Entities Classification
+#'
+#' @description
+#' Provides an overview of the species clustering into functional entities.
+#'
+#' @param object An object of class \code{ascfcd_entities}.
+#' @param ... Further arguments passed to or from other methods.
+#'
+#' @return Invisibly returns the classification data frame.
+#' @export
+summary.ascfcd_entities <- function(object, ...) {
+  cat("==================================================\n")
+  cat(" ASC-FCD: Functional Entities Classification \n")
+  cat("==================================================\n\n")
+
+  df <- object$entity_classification
+  n_spp <- nrow(df)
+  n_ent <- length(unique(df$Entity_ID))
+
+  cat(sprintf("Total Species: %d\n", n_spp))
+  cat(sprintf("Functional Entities Identified: %d\n", n_ent))
+  cat(sprintf("Distance Metric: %s | Clustering Method: %s\n\n",
+              tools::toTitleCase(object$metric), object$method))
+
+  cat("--- Species Distribution per Entity ---\n")
+  dist_table <- table(df$Entity_ID)
+  print(dist_table)
+  cat("\n")
+
+  cat("--- Classification Preview (Head) ---\n")
+  print(utils::head(df, 5), row.names = FALSE)
+  cat("\n")
+
+  invisible(df)
 }

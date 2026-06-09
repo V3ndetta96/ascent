@@ -63,8 +63,8 @@ asc_pairwise <- function(traits, abund, dist_method = "gower",
   }
 
   cwm_global <- abund_rel %*% F_mat
-  Dmax_empirical <- max(stats::dist(cwm_global))
-  if(Dmax_empirical == 0) Dmax_empirical <- 1
+  Dmax_regional <- max(stats::dist(F_mat))
+  if(Dmax_regional == 0) Dmax_regional <- 1
 
   communities <- rownames(abund_rel)
   combinations <- utils::combn(communities, 2, simplify = FALSE)
@@ -87,7 +87,7 @@ asc_pairwise <- function(traits, abund, dist_method = "gower",
     v_dir <- cwm_B - cwm_A
     directional_vectors[[pair_name]] <- v_dir
     dist_abs <- sqrt(sum(v_dir^2))
-    r_delta <- (dist_abs / Dmax_empirical) * 100
+    r_delta <- (dist_abs / Dmax_regional) * 100
 
     topo_A <- calc_topology(as.numeric(p_ref_mat), F_mat)
     topo_B <- calc_topology(as.numeric(p_comp_mat), F_mat)
@@ -102,7 +102,7 @@ asc_pairwise <- function(traits, abund, dist_method = "gower",
   }
 
   output <- list(
-    pairwise_results = results, Dmax_empirical = Dmax_empirical,
+    pairwise_results = results, Dmax_regional = Dmax_regional,
     directional_vectors = directional_vectors,
     p_ref = p_ref_list, p_comp = p_comp_list,
     cwm_global = cwm_global, F_space = F_mat, k_retained = k_valid,
