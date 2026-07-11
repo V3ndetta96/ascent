@@ -67,12 +67,9 @@ plot.ascfcd <- function(x, contrast, type = c("both", "pcoa", "leverage"), n_sp 
   var_p2 <- x$axis_var[2] * 100
 
   res <- x$site_results[[contrast]]
-  trend <- ifelse(res$Delta_FRic > 0, "Vol Expansion", ifelse(res$Delta_FRic < 0, "Vol Contraction",
-                                                              ifelse(res$Delta_FDis > 0.01, "Internal Expansion", ifelse(res$Delta_FDis < -0.01, "Internal Contraction", "Stable"))))
-
-  # Subtítulo con salto de línea (\n) para evitar superposiciones
-  sub_text <- sprintf("Delta C: %.1f%%\nDelta FDis: %.2f | Trend: %s",
-                      x$rDelta_C[contrast], res$Delta_FDis, trend)
+  fric_text <- if(is.na(res$Delta_FRic)) "NA" else sprintf("%.4f", res$Delta_FRic)
+  sub_text <- sprintf("rDelta C: %.1f%%\nDelta FDis: %.4f | Delta FRic: %s",
+                      x$rDelta_C[contrast], res$Delta_FDis, fric_text)
 
   p_pca <- ggplot() +
     geom_point(data = df_spp, aes(x = PC1, y = PC2), color = "grey85", size = 1.5, alpha = 0.8)
@@ -101,22 +98,7 @@ plot.ascfcd <- function(x, contrast, type = c("both", "pcoa", "leverage"), n_sp 
   # 2. FUNCTIONAL LEVERAGE PLOT
   # ============================================================================
   trans <- asc_transitions(x)
-  df_lev <- trans[[contrast]]$species_leverage
-  df_lev$Abs_Lev <- abs(df_lev$Leverage)
-  df_lev <- df_lev[order(df_lev$Abs_Lev, decreasing = TRUE), ]
-  df_lev <- utils::head(df_lev, n_sp)
-  df_lev <- df_lev[order(df_lev$Leverage), ]
-  df_lev$Species <- factor(df_lev$Species, levels = df_lev$Species)
-
-  p_lev <- ggplot(df_lev, aes(x = Leverage, y = Species)) +
-    geom_segment(aes(x = 0, xend = Leverage, y = Species, yend = Species), color = "grey60", linewidth = 1) +
-    geom_point(aes(color = Leverage > 0), size = 4) +
-    scale_color_manual(values = c("TRUE" = "#d73027", "FALSE" = "#4575b4")) +
-    geom_vline(xintercept = 0, color = "grey50", linewidth = 0.8) +
-    theme_minimal(base_size = 13) +
-    labs(title = "Functional Leverage", subtitle = "Top Drivers of Centroid Shift",
-         x = "Leverage Score", y = "") +
-    theme(legend.position = "none", panel.grid.minor = element_blank())
+  p_lev <- .plot_leverage(trans, contrast, n_sp)
 
   if (type == "leverage") return(p_lev)
 
@@ -178,11 +160,9 @@ plot.ascfcd_pw <- function(x, contrast, type = c("both", "pcoa", "leverage"), n_
   if(nrow(df_hulls) > 0) df_hulls$Community <- factor(df_hulls$Community, levels = c(com_A, com_B))
 
   res <- x$pairwise_results[x$pairwise_results$Community_A == com_A & x$pairwise_results$Community_B == com_B, ]
-  trend <- ifelse(res$Delta_FRic > 0, "Vol Expansion", ifelse(res$Delta_FRic < 0, "Vol Contraction",
-                                                              ifelse(res$Delta_FDis > 0.01, "Internal Expansion", ifelse(res$Delta_FDis < -0.01, "Internal Contraction", "Stable"))))
-
-  # Subtítulo con salto de línea (\n) para evitar superposiciones
-  sub_text <- sprintf("rDelta C: %.1f%%\nDelta FDis: %.2f | Trend: %s", res$rDelta_C_pct, res$Delta_FDis, trend)
+  fric_text <- if(is.na(res$Delta_FRic)) "NA" else sprintf("%.4f", res$Delta_FRic)
+  sub_text <- sprintf("rDelta C: %.1f%%\nDelta FDis: %.4f | Delta FRic: %s",
+                      res$rDelta_C_pct, res$Delta_FDis, fric_text)
 
   p_pca <- ggplot() +
     geom_point(data = df_spp, aes(x = PC1, y = PC2), color = "grey85", size = 1.5, alpha = 0.8)
@@ -206,36 +186,9 @@ plot.ascfcd_pw <- function(x, contrast, type = c("both", "pcoa", "leverage"), n_
 
   if (type == "pcoa") return(p_pca)
 
-  # Leverage Espacial
-  delta_p <- as.numeric(x$p_comp[[contrast]] - x$p_ref[[contrast]])
-  v_dir <- x$directional_vectors[[contrast]]
-  mag_v <- sqrt(sum(v_dir^2))
-
-  if(mag_v == 0) {
-    df_lev <- data.frame(Species = rownames(F_mat), Leverage = 0)
-  } else {
-    u_dir <- v_dir / mag_v
-    projections <- numeric(nrow(F_mat))
-    for (i in seq_len(nrow(F_mat))) {
-      projections[i] <- sum((F_mat[i, ] - as.numeric(c_A)) * u_dir)
-    }
-    df_lev <- data.frame(Species = rownames(F_mat), Leverage = delta_p * projections)
-  }
-
-  df_lev$Abs_Lev <- abs(df_lev$Leverage)
-  df_lev <- df_lev[order(df_lev$Abs_Lev, decreasing = TRUE), ]
-  df_lev <- utils::head(df_lev, n_sp)
-  df_lev <- df_lev[order(df_lev$Leverage), ]
-  df_lev$Species <- factor(df_lev$Species, levels = df_lev$Species)
-
-  p_lev <- ggplot(df_lev, aes(x = Leverage, y = Species)) +
-    geom_segment(aes(x = 0, xend = Leverage, y = Species, yend = Species), color = "grey60", linewidth = 1) +
-    geom_point(aes(color = Leverage > 0), size = 4) +
-    scale_color_manual(values = c("TRUE" = "#d73027", "FALSE" = "#4575b4")) +
-    geom_vline(xintercept = 0, color = "grey50", linewidth = 0.8) +
-    theme_minimal(base_size = 13) +
-    labs(title = "Spatial Leverage", subtitle = "Drivers of divergence", x = "Leverage Score", y = "") +
-    theme(legend.position = "none", panel.grid.minor = element_blank())
+  # Leverage via asc_transitions (DRY)
+  trans <- asc_transitions(x)
+  p_lev <- .plot_leverage(trans, contrast, n_sp)
 
   if (type == "leverage") return(p_lev)
   if (!requireNamespace("patchwork", quietly = TRUE)) return(p_pca)
@@ -261,4 +214,48 @@ plot.ascfcd_entities <- function(x, ...) {
   if(n_clusters > 1) {
     stats::rect.hclust(x$hclust_obj, k = n_clusters, border = "red")
   }
+}
+
+#' Plot Functional Leverage
+#'
+#' @description
+#' Visualizes the top species driving functional centroid displacement.
+#'
+#' @param x An object of class \code{ascfcd_transitions}.
+#' @param contrast Character. The contrast to plot.
+#' @param n_sp Integer. Number of top species to display. Default is 10.
+#' @param ... Additional graphical arguments.
+#'
+#' @import ggplot2
+#' @return A ggplot object.
+#' @export
+plot.ascfcd_transitions <- function(x, contrast, n_sp = 10, ...) {
+  if(!(contrast %in% names(x))) {
+    stop(sprintf("Contrast '%s' not found. Available: %s", contrast, paste(names(x), collapse = ", ")))
+  }
+  .plot_leverage(x, contrast, n_sp)
+}
+
+
+# ==============================================================================
+# INTERNAL LEVERAGE PLOT ENGINE
+# ==============================================================================
+#' @noRd
+.plot_leverage <- function(trans_obj, contrast, n_sp = 10) {
+  df_lev <- trans_obj[[contrast]]$species_leverage
+  df_lev$Abs_Lev <- abs(df_lev$Leverage)
+  df_lev <- df_lev[order(df_lev$Abs_Lev, decreasing = TRUE), ]
+  df_lev <- utils::head(df_lev, n_sp)
+  df_lev <- df_lev[order(df_lev$Leverage), ]
+  df_lev$Species <- factor(df_lev$Species, levels = df_lev$Species)
+
+  ggplot(df_lev, aes(x = Leverage, y = Species)) +
+    geom_segment(aes(x = 0, xend = Leverage, y = Species, yend = Species), color = "grey60", linewidth = 1) +
+    geom_point(aes(color = Leverage > 0), size = 4) +
+    scale_color_manual(values = c("TRUE" = "#d73027", "FALSE" = "#4575b4")) +
+    geom_vline(xintercept = 0, color = "grey50", linewidth = 0.8) +
+    theme_minimal(base_size = 13) +
+    labs(title = "Functional Leverage", subtitle = "Top Drivers of Centroid Shift",
+         x = "Leverage Score", y = "") +
+    theme(legend.position = "none", panel.grid.minor = element_blank())
 }

@@ -11,6 +11,18 @@
 #' @param h Numeric. Height at which to cut the dendrogram. If both \code{k} and \code{h} are \code{NULL}, defaults to \code{k = 3}.
 #'
 #' @return An S3 object of class \code{ascfcd_entities}.
+#'
+#' @examples
+#' traits <- data.frame(
+#'   Mass = c(15, 30, 60, 150, 400),
+#'   Beak = c(10, 15, 28,  45,  85),
+#'   Diet = factor(c(0, 1, 1, 1, 0))
+#' )
+#' rownames(traits) <- paste0("Sp", 1:5)
+#'
+#' ent <- asc_entities(traits, k = 2)
+#' summary(ent)
+#'
 #' @export
 asc_entities <- function(traits, dist_method = "gower", hclust_method = "ward.D2", k = NULL, h = NULL) {
 

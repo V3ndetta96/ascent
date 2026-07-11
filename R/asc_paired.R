@@ -14,61 +14,57 @@
 #' @param var_tol Numeric. Proportion of cumulative variance to retain. Default is 0.80.
 #' @param na.rm Logical. Remove missing values? Default is TRUE.
 #'
+#' @note
+#' **Normalization:** Delta FDis and Delta FRic are absolute differences, not
+#' normalized by the regional pool. Values are not directly comparable across
+#' studies with different species pools or trait scales. Only rDelta_C (position)
+#' is normalized by Dmax_regional.
+#'
+#' **FRic = NA:** When a community has fewer species than retained PCoA axes,
+#' the convex hull is geometrically undefined and FRic is set to \code{NA},
+#' which propagates to Delta_FRic.
+#'
+#' **Temporal replicates:** When multiple rows share the same site and temporal
+#' state (e.g., three reference plots), their relative abundances are averaged
+#' (column means) before computing the centroid. This is equivalent to treating
+#' replicates as a single pooled community. Intra-state variability is not
+#' propagated to downstream metrics.
+#'
 #' @return An S3 object of class \code{ascfcd}.
+#'
+#' @examples
+#' # Simulate deforestation impact on a bird community
+#' traits <- data.frame(
+#'   Mass  = c(15, 30, 60, 150, 400),
+#'   Beak  = c(10, 15, 28,  45,  85),
+#'   Diet  = factor(c(0, 1, 1, 1, 0))
+#' )
+#' rownames(traits) <- paste0("Sp", 1:5)
+#'
+#' abund <- rbind(
+#'   Reference = c(0, 10, 25, 20, 5),
+#'   Impacted  = c(30, 15,  5,  0, 0)
+#' )
+#'
+#' res <- asc_paired(
+#'   traits, abund,
+#'   sites = c("Site1", "Site1"),
+#'   time = c("Reference", "Impacted"),
+#'   ref_time = "Reference"
+#' )
+#' summary(res)
+#'
 #' @export
 asc_paired <- function(traits, abund, sites, time, ref_time, dist_method = "gower",
                        dim_retention = c("variance", "broken_stick"), var_tol = 0.80, na.rm = TRUE) {
 
   dim_retention <- match.arg(dim_retention)
-  if (!requireNamespace("geometry", quietly = TRUE)) {
-    stop("The 'geometry' package is required for FRic calculations. Please install it.")
-  }
 
   if(nrow(traits) != ncol(abund)) stop("Number of species in traits and abundances does not match.")
   abund_rel <- as.matrix(sweep(abund, 1, rowSums(abund, na.rm = na.rm), "/"))
 
-  d_mat <- cluster::daisy(traits, metric = dist_method)
-  pcoa_res <- suppressWarnings(stats::cmdscale(d_mat, k = nrow(traits) - 1, eig = TRUE))
-
-  eig_raw <- pcoa_res$eig
-  eig_pos <- eig_raw[eig_raw > 1e-8]
-  rel_var <- eig_pos / sum(eig_pos)
-  cum_var <- cumsum(rel_var)
-
-  if (dim_retention == "variance") {
-    k_valid <- min(which(cum_var >= var_tol))
-  } else if (dim_retention == "broken_stick") {
-    n_eig <- length(eig_pos)
-    bs_expected <- sapply(1:n_eig, function(k) sum(1 / (k:n_eig)) / n_eig)
-    k_valid <- sum(rel_var > bs_expected)
-  }
-  if(k_valid < 2) k_valid <- 2
-
-  axis_var <- rel_var[1:k_valid]
-  total_var_retained <- cum_var[k_valid]
-  F_mat <- pcoa_res$points[, 1:k_valid, drop = FALSE]
-  colnames(F_mat) <- paste0("Axis_", 1:k_valid)
-
-  # Motor Topológico Multicapa (FDis y FRic)
-  calc_topology <- function(abund_vec, F_space) {
-    idx <- abund_vec > 0
-    if(sum(idx) < 2) return(list(FDis = 0, FRic = 0))
-
-    p_pres <- abund_vec[idx] / sum(abund_vec[idx])
-    F_pres <- F_space[idx, , drop = FALSE]
-
-    centroid <- colSums(p_pres * F_pres)
-    dist_to_c <- sqrt(rowSums(sweep(F_pres, 2, centroid, "-")^2))
-    fdis <- sum(p_pres * dist_to_c)
-
-    fric <- 0
-    if (sum(idx) > ncol(F_space)) {
-      fric <- tryCatch({
-        geometry::convhulln(F_pres, options = "FA")$vol
-      }, error = function(e) 0)
-    }
-    return(list(FDis = fdis, FRic = fric))
-  }
+  fs <- .build_functional_space(traits, dist_method, dim_retention, var_tol)
+  F_mat <- fs$F_mat
 
   cwm_global <- abund_rel %*% F_mat
   Dmax_regional <- max(stats::dist(F_mat))
@@ -103,13 +99,23 @@ asc_paired <- function(traits, abund, sites, time, ref_time, dist_method = "gowe
     dist_abs <- sqrt(sum(v_dir^2))
     rDelta_C[s] <- (dist_abs / Dmax_regional) * 100
 
-    topo_ref <- calc_topology(as.numeric(p_ref_mat), F_mat)
-    topo_comp <- calc_topology(as.numeric(p_comp_mat), F_mat)
+    # Guard: zero displacement
+    ss_vdir <- sum(v_dir^2)
+    if (ss_vdir < 1e-12) {
+      asc_contrib <- rep(0, length(v_dir))
+      crit_axis <- NA_integer_
+    } else {
+      asc_contrib <- (v_dir^2 / ss_vdir) * 100
+      crit_axis <- which.max(asc_contrib)
+    }
+
+    topo_ref <- .calc_core_topology(as.numeric(p_ref_mat), F_mat)
+    topo_comp <- .calc_core_topology(as.numeric(p_comp_mat), F_mat)
 
     res_list[[s]] <- list(
       abs_dist = dist_abs,
-      asc = (v_dir^2 / sum(v_dir^2)) * 100,
-      critical_axis = which.max((v_dir^2 / sum(v_dir^2)) * 100),
+      asc = asc_contrib,
+      critical_axis = crit_axis,
       Delta_FDis = topo_comp$FDis - topo_ref$FDis,
       Delta_FRic = topo_comp$FRic - topo_ref$FRic
     )
@@ -123,8 +129,9 @@ asc_paired <- function(traits, abund, sites, time, ref_time, dist_method = "gowe
     p_ref = p_ref_list, p_comp = p_comp_list,
     cwm_ref = cwm_ref_list, cwm_comp = cwm_comp_list,
     site_results = res_list[valid_sites],
-    F_space = F_mat, k_retained = k_valid,
-    var_retained = total_var_retained, axis_var = axis_var,
+    F_space = F_mat, k_retained = fs$k_retained,
+    var_retained = fs$var_retained, axis_var = fs$axis_var,
+    quality = fs$quality,
     original_traits = traits, original_abund = abund_rel
   )
   class(output) <- "ascfcd"

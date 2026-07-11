@@ -1,9 +1,17 @@
 Package: ascent
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
-Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+Title: Multi-Layer Decomposition of Functional Community Restructuring
+Version: 0.1.0
+Authors@R: c(
+    person("Rogelio R.", "Muñoz-Li", email = "munozrogelio16@gmail.com", role = c("aut", "cre")),
+    person("Flavia", "Alvarez-Denis", role = "aut")
+    )
+Description: Implements the ASC-CFD framework for decomposing functional
+    community restructuring into positional (centroid displacement),
+    dispersive (functional dispersion), and boundary (convex hull volume)
+    components. Provides hierarchical null models (structural, quantitative,
+    identity) to evaluate statistical significance and species-level leverage
+    analysis to identify taxa driving functional shifts. Supports both
+    temporal (paired) and spatial (pairwise) comparisons.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -20,6 +28,7 @@ Suggests:
     patchwork,
     rmarkdown,
     testthat (>= 3.0.0)
+Config/testthat/edition: 3
 URL: https://github.com/V3ndetta96/ascent
 BugReports: https://github.com/V3ndetta96/ascent/issues
 VignetteBuilder: knitr

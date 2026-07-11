@@ -168,3 +168,39 @@ This classification helps researchers map continuous traits into discrete ecolog
 | Functional entities    | `asc_entities()`    |
 | Null model inference   | `asc_null()`        |
 
+---
+
+## Part VII - Methodological Notes
+
+### Interpreting FRic ($\Delta FRic$)
+
+FRic is computed as the volume of the convex hull in the retained PCoA axes. It captures the **outer boundary** of the functional space and has the following properties:
+
+- It is driven exclusively by **extreme species** (hull vertices). Internal species, regardless of abundance, do not alter FRic.
+- It is **not abundance-weighted.** A species that increases from 1% to 90% will not change FRic unless it lies on the hull boundary.
+- When a community has fewer species than retained axes ($S < k$), the hull is geometrically undefined. In this case, ascent reports `FRic = NA` rather than `FRic = 0`, because a zero-volume hull is a meaningful geometric statement (collinear species), while `NA` signals that the metric cannot be computed.
+
+**Recommendation:** Interpret $\Delta FRic$ as a topological descriptor of the functional boundary, complementary to (but not substituting for) the abundance-weighted $\Delta FDis$.
+
+### Normalization and Cross-Study Comparisons
+
+- **$r\Delta C_{\%}$** (positional shift) is normalized by the regional functional diameter ($D_{max,regional}$) and is directly comparable across studies.
+- **$\Delta FDis$** and **$\Delta FRic$** are absolute differences in the retained PCoA space. Their magnitude depends on the number of retained axes, the trait set, and the Gower distance matrix. Direct comparison across studies with different trait pools requires caution.
+
+### Null Model Scope
+
+`asc_null()` operates on the full stacked community matrix and assumes a **shared regional species pool.** The curveball algorithm permutes species across all rows simultaneously. For biogeographically independent sites, run `asc_null()` on each contrast separately.
+
+Model A assigns **uniform relative abundances** ($1/S_{local}$) to all species present after the curveball permutation. This means the null distribution for FDis under Model A tests whether the shift is extreme given random species composition with equitable abundances, not with the observed SAD.
+
+### Functional Leverage: Additive Decomposition
+
+The Functional Leverage satisfies a strict mathematical identity:
+
+$$\sum_{i=1}^{S} \text{Leverage}_i = \|\Delta C\|$$
+
+Each species' leverage is the product of its demographic change and its alignment with the centroid trajectory:
+
+$$\text{Leverage}_i = \Delta p_i \cdot \text{proj}(\mathbf{f}_i, \hat{v})$$
+
+where $\Delta p_i = p_{i,\text{comp}} - p_{i,\text{ref}}$ is the change in relative abundance, and $\text{proj}(\mathbf{f}_i, \hat{v})$ is the scalar projection of the species' PCoA coordinates onto the unit directional vector $\hat{v}$ of the centroid shift. Species with positive leverage **drive** the shift; species with negative leverage **resist** it.

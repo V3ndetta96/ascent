@@ -1,0 +1,11 @@
+bibentry(
+  bibtype  = "Manual",
+  title    = "ascent: A Multi-Layer Framework for Decomposing Functional Community Restructuring into Positional, Dispersive and Boundary Components under Hierarchical Null Models",
+  author   = c(
+    person("Rogelio R.", "Muñoz-Li"),
+    person("Flavia", "Alvarez-Denis")
+  ),
+  year     = "2026",
+  url      = "https://github.com/V3ndetta96/ascent",
+  note     = "R package version 0.1.0"
+)

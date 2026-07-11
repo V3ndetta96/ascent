@@ -68,11 +68,13 @@ You can install the development version of `ascent` from GitHub with:
 ```r
 # install.packages("devtools")
 devtools::install_github("V3ndetta96/ascent")
+```
 
-💻 Quick Start
+## 💻 Quick Start
+
 Here is a basic workflow evaluating the functional impact of deforestation on a bird community using mixed trait data (quantitative and binary).
-library(ascent)
 
+```r
 library(ascent)
 
 # 1. Define Traits and Abundances
@@ -100,29 +102,69 @@ res <- asc_null(res, n_perm = 999, seed = 123)
 
 # 4. View Automated Ecological Diagnostic
 summary(res)
+```
 
-Visualizing Dynamic Topology and Functional Leverage
-ascent includes built-in ggplot2/patchwork methods to visualize the PCoA trajectory, the 2D Convex Hull boundaries, and the Functional Leverage (the specific taxa pulling or releasing the centroid).
+### Visualizing Dynamic Topology and Functional Leverage
 
+`ascent` includes built-in `ggplot2`/`patchwork` methods to visualize the PCoA trajectory, the 2D Convex Hull boundaries, and the Functional Leverage (the specific taxa pulling or releasing the centroid).
+
+```r
 plot(res, contrast = "Site1", type = "both", n_sp = 5)
+```
 
-🛠️ Package API Overview
-asc_entities(): Calculates the absolute baseline functional topology (CWM, FDis, FRic) for isolated communities.
+## 🛠️ Package API Overview
 
-asc_paired(): Evaluates temporal or paired experimental contrasts.
+| Function | Purpose |
+|---|---|
+| `asc_baseline()` | Absolute baseline functional topology (CWM, FDis, FRic) for isolated communities |
+| `asc_paired()` | Temporal or paired experimental contrasts |
+| `asc_pairwise()` | Bidirectional spatial divergence across all community pairs |
+| `asc_null()` | Triad of null models (Structural, Quantitative, Identity) |
+| `asc_transitions()` | Multidimensional leverage score for every species |
+| `asc_entities()` | Species clustering into discrete functional entities |
+| `assess_functional_space()` | Diagnostic tool to evaluate PCoA quality and dimensionality |
 
-asc_pairwise(): Computes bidirectional spatial divergence across all combinations in a regional network (Beta-diversity).
+## 📖 Documentation & Vignettes
 
-asc_null(): Triggers the triad of null models (Structural, Quantitative, Identity).
-
-asc_transitions(): Extracts the exact multidimensional leverage score for every species.
-
-📖 Documentation & Vignettes
 For a comprehensive guide, including spatial network analyses and detailed ecological interpretations, please read the official vignette:
 
+```r
 vignette("ascent_tutorial")
+```
+
+## ⚠️ Methodological Notes
+
+### FRic (Functional Richness)
+
+FRic is computed as the volume of the convex hull in the retained PCoA space. Key considerations:
+
+- **Depends exclusively on extreme species.** FRic captures the outer boundary of the functional space. It is insensitive to internal reorganization of biomass. A species that increases from 1% to 90% relative abundance will not alter FRic if it is not on the hull boundary.
+- **Not abundance-weighted.** Unlike FDis or the centroid, FRic is a purely incidence-based metric within the framework. It should be interpreted as a **topological descriptor** of the functional boundary, not as a robust estimate of functional change.
+- **Requires N > k.** When a community has fewer species than retained PCoA axes, the convex hull is geometrically undefined and FRic is reported as `NA`.
+
+### ΔFDis (Functional Dispersion Change)
+
+- **Not normalized.** ΔFDis is an absolute difference in the retained PCoA space. Its magnitude depends on the trait scales, the number of retained axes, and the Gower distance matrix. Direct comparisons across studies with different species pools or trait sets should be made with caution.
+- **Normalized position:** Only the positional component (rΔC%) is normalized by the regional functional diameter (Dmax_regional), enabling cross-study comparisons.
+
+### Null Model Scope
+
+`asc_null()` operates on the full stacked community matrix, assuming a **shared regional species pool**. When analyzing biogeographically independent sites, contrasts should be evaluated separately by calling `asc_null()` on each `ascfcd` object independently.
+
+### Functional Leverage: Additive Property
+
+The Functional Leverage satisfies a strict mathematical decomposition:
+
+$$\sum_{i=1}^{S} \text{Leverage}_i = \|\Delta C\|$$
+
+where $\|\Delta C\|$ is the absolute Euclidean distance between centroids. Each species' leverage is the product of its demographic change ($\Delta p_i$) and its projection onto the unit direction of the centroid shift:
+
+$$\text{Leverage}_i = \Delta p_i \cdot \text{proj}(\mathbf{f}_i, \hat{v})$$
+
+This property ensures that the sum of all individual species contributions exactly reconstructs the total centroid displacement. Species with positive leverage **drive** the shift; species with negative leverage **resist** it.
 
 ## ✒️ Citation
+
 While the official manuscript is in preparation, if you use `ascent` in your research, please cite the package directly:
 
 Muñoz-Li, R. R. & F. Alvarez-Denis (2026). ascent: A multi-layer framework for decomposing functional community restructuring into positional, dispersive and boundary components under hierarchical null models. https://github.com/V3ndetta96/ascent

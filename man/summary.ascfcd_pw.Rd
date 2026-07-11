@@ -15,5 +15,5 @@
 Invisibly returns the pairwise results data frame.
 }
 \description{
-Provides a comprehensive overview of the spatial network ASC-FCD analysis.
+Provides a comprehensive overview of the spatial network ASC-CFD analysis.
 }

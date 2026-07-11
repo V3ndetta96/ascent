@@ -10,57 +10,44 @@
 #' @param var_tol Numeric. Proportion of cumulative variance to retain. Default is 0.80.
 #' @param na.rm Logical. Remove missing values? Default is TRUE.
 #'
+#' @note
+#' **Leverage direction:** In pairwise mode, leverage is computed from
+#' Community_A toward Community_B. Reversing the pair order reverses the
+#' leverage signs. The direction is determined by alphabetical ordering of
+#' community names.
+#'
+#' **Normalization:** Delta FDis and Delta FRic are absolute differences (see
+#' \code{\link{asc_paired}} for details).
+#'
 #' @return An S3 object of class \code{ascfcd_pw}.
+#'
+#' @examples
+#' traits <- data.frame(
+#'   Mass = c(15, 30, 60, 150, 400),
+#'   Beak = c(10, 15, 28,  45,  85)
+#' )
+#' rownames(traits) <- paste0("Sp", 1:5)
+#'
+#' abund <- rbind(
+#'   Forest  = c(0,  5, 25, 20, 10),
+#'   Field   = c(30, 20, 10,  0,  0),
+#'   Wetland = c(5, 10, 15, 15,  5)
+#' )
+#'
+#' res_pw <- asc_pairwise(traits, abund, dist_method = "euclidean")
+#' summary(res_pw)
+#'
 #' @export
 asc_pairwise <- function(traits, abund, dist_method = "gower",
                          dim_retention = c("variance", "broken_stick"), var_tol = 0.80, na.rm = TRUE) {
 
   dim_retention <- match.arg(dim_retention)
-  if (!requireNamespace("geometry", quietly = TRUE)) {
-    stop("The 'geometry' package is required for FRic calculations. Please install it.")
-  }
 
   if(nrow(traits) != ncol(abund)) stop("Number of species in traits and abundances does not match.")
   abund_rel <- as.matrix(sweep(abund, 1, rowSums(abund, na.rm = na.rm), "/"))
-  d_mat <- cluster::daisy(traits, metric = dist_method)
-  pcoa_res <- suppressWarnings(stats::cmdscale(d_mat, k = nrow(traits) - 1, eig = TRUE))
 
-  eig_raw <- pcoa_res$eig
-  eig_pos <- eig_raw[eig_raw > 1e-8]
-  rel_var <- eig_pos / sum(eig_pos)
-  cum_var <- cumsum(rel_var)
-
-  if (dim_retention == "variance") {
-    k_valid <- min(which(cum_var >= var_tol))
-  } else if (dim_retention == "broken_stick") {
-    n_eig <- length(eig_pos)
-    bs_expected <- sapply(1:n_eig, function(k) sum(1 / (k:n_eig)) / n_eig)
-    k_valid <- sum(rel_var > bs_expected)
-  }
-  if(k_valid < 2) k_valid <- 2
-
-  axis_var <- rel_var[1:k_valid]
-  total_var_retained <- cum_var[k_valid]
-  F_mat <- pcoa_res$points[, 1:k_valid, drop = FALSE]
-  colnames(F_mat) <- paste0("Axis_", 1:k_valid)
-
-  calc_topology <- function(abund_vec, F_space) {
-    idx <- abund_vec > 0
-    if(sum(idx) < 2) return(list(FDis = 0, FRic = 0))
-    p_pres <- abund_vec[idx] / sum(abund_vec[idx])
-    F_pres <- F_space[idx, , drop = FALSE]
-    centroid <- colSums(p_pres * F_pres)
-    dist_to_c <- sqrt(rowSums(sweep(F_pres, 2, centroid, "-")^2))
-    fdis <- sum(p_pres * dist_to_c)
-
-    fric <- 0
-    if (sum(idx) > ncol(F_space)) {
-      fric <- tryCatch({
-        geometry::convhulln(F_pres, options = "FA")$vol
-      }, error = function(e) 0)
-    }
-    return(list(FDis = fdis, FRic = fric))
-  }
+  fs <- .build_functional_space(traits, dist_method, dim_retention, var_tol)
+  F_mat <- fs$F_mat
 
   cwm_global <- abund_rel %*% F_mat
   Dmax_regional <- max(stats::dist(F_mat))
@@ -89,8 +76,8 @@ asc_pairwise <- function(traits, abund, dist_method = "gower",
     dist_abs <- sqrt(sum(v_dir^2))
     r_delta <- (dist_abs / Dmax_regional) * 100
 
-    topo_A <- calc_topology(as.numeric(p_ref_mat), F_mat)
-    topo_B <- calc_topology(as.numeric(p_comp_mat), F_mat)
+    topo_A <- .calc_core_topology(as.numeric(p_ref_mat), F_mat)
+    topo_B <- .calc_core_topology(as.numeric(p_comp_mat), F_mat)
 
     res_row <- data.frame(
       Community_A = com_A, Community_B = com_B,
@@ -105,8 +92,9 @@ asc_pairwise <- function(traits, abund, dist_method = "gower",
     pairwise_results = results, Dmax_regional = Dmax_regional,
     directional_vectors = directional_vectors,
     p_ref = p_ref_list, p_comp = p_comp_list,
-    cwm_global = cwm_global, F_space = F_mat, k_retained = k_valid,
-    var_retained = total_var_retained, axis_var = axis_var,
+    cwm_global = cwm_global, F_space = F_mat, k_retained = fs$k_retained,
+    var_retained = fs$var_retained, axis_var = fs$axis_var,
+    quality = fs$quality,
     original_traits = traits, original_abund = abund_rel
   )
   class(output) <- "ascfcd_pw"

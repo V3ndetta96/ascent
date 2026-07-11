@@ -33,3 +33,19 @@ An S3 object of class \code{ascfcd_base}.
 Calculates the absolute functional centroid (CWM), functional dispersion (FDis),
 and convex hull volume (FRic) for each community or site independently.
 }
+\examples{
+traits <- data.frame(
+  Mass = c(15, 30, 60, 150, 400),
+  Beak = c(10, 15, 28,  45,  85)
+)
+rownames(traits) <- paste0("Sp", 1:5)
+
+abund <- rbind(
+  Forest = c(0,  5, 25, 20, 10),
+  Field  = c(30, 20, 10,  0,  0)
+)
+
+base <- asc_baseline(traits, abund, dist_method = "euclidean")
+summary(base)
+
+}

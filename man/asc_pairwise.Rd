@@ -32,3 +32,29 @@ An S3 object of class \code{ascfcd_pw}.
 \description{
 Calculates spatial functional divergence across three layers: position (Delta C), dispersion (FDis), and volume (FRic).
 }
+\note{
+\strong{Leverage direction:} In pairwise mode, leverage is computed from
+Community_A toward Community_B. Reversing the pair order reverses the
+leverage signs. The direction is determined by alphabetical ordering of
+community names.
+
+\strong{Normalization:} Delta FDis and Delta FRic are absolute differences (see
+\code{\link{asc_paired}} for details).
+}
+\examples{
+traits <- data.frame(
+  Mass = c(15, 30, 60, 150, 400),
+  Beak = c(10, 15, 28,  45,  85)
+)
+rownames(traits) <- paste0("Sp", 1:5)
+
+abund <- rbind(
+  Forest  = c(0,  5, 25, 20, 10),
+  Field   = c(30, 20, 10,  0,  0),
+  Wetland = c(5, 10, 15, 15,  5)
+)
+
+res_pw <- asc_pairwise(traits, abund, dist_method = "euclidean")
+summary(res_pw)
+
+}

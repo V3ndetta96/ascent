@@ -8,7 +8,29 @@
 #' @param x An object of class \code{ascfcd} or \code{ascfcd_pw}.
 #' @param ... Further arguments passed to or from other methods.
 #'
-#' @return A list of data frames containing species leverage for each contrast.
+#' @return An S3 object of class \code{ascfcd_transitions}.
+#'
+#' @examples
+#' traits <- data.frame(
+#'   Mass = c(15, 30, 60, 150, 400),
+#'   Beak = c(10, 15, 28,  45,  85)
+#' )
+#' rownames(traits) <- paste0("Sp", 1:5)
+#'
+#' abund <- rbind(
+#'   Ref = c(0, 10, 25, 20, 5),
+#'   Imp = c(30, 15,  5,  0, 0)
+#' )
+#'
+#' res <- asc_paired(
+#'   traits, abund,
+#'   sites = c("S1", "S1"),
+#'   time = c("R", "I"), ref_time = "R",
+#'   dist_method = "euclidean"
+#' )
+#' drivers <- asc_transitions(res)
+#' drivers$S1$species_leverage
+#'
 #' @export
 asc_transitions <- function(x, ...) {
   if (!inherits(x, c("ascfcd", "ascfcd_pw"))) {
@@ -28,7 +50,7 @@ asc_transitions <- function(x, ...) {
     p_c <- as.numeric(x$p_comp[[s]])
     delta_p <- p_c - p_r
 
-    if (mag_v == 0) {
+    if (mag_v < 1e-12) {
       # Si no hay desplazamiento, el leverage es nulo
       df_lev <- data.frame(Species = rownames(F_mat), Delta_p = delta_p, Projection = 0, Leverage = 0)
     } else {
@@ -54,9 +76,9 @@ asc_transitions <- function(x, ...) {
 
       df_lev <- data.frame(
         Species = rownames(F_mat),
-        Delta_p = round(delta_p, 4),
-        Projection = round(projections, 4),
-        Leverage = round(leverage, 4)
+        Delta_p = delta_p,
+        Projection = projections,
+        Leverage = leverage
       )
     }
 
@@ -67,5 +89,6 @@ asc_transitions <- function(x, ...) {
     res_list[[s]] <- list(species_leverage = df_lev)
   }
 
+  class(res_list) <- "ascfcd_transitions"
   return(res_list)
 }

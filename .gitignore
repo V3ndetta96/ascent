@@ -5,3 +5,10 @@
 .DS_Store
 .quarto
 inst/doc
+GEMINI.md
+ASCFCD_technical_document.md
+ASCFCD_documento_tecnico.md
+ascent.Rcheck
+*.tar.gz
+/doc/
+/Meta/

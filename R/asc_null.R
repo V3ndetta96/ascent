@@ -8,26 +8,95 @@
 #' @param n_perm Integer. Number of permutations. Default is 999.
 #' @param seed Integer. Random seed for reproducibility.
 #'
+#' @note
+#' **Model A (Structural):** After curveball permutation, all species present
+#' receive uniform relative abundance (1/S_local). This means the null distribution
+#' for FDis conflates the effect of taxonomic identity with the assumption of
+#' equitability. The SES tests whether the observed shift is extreme given
+#' random species composition, *not* given random composition with the observed SAD.
+#'
+#' **Model B (Quantitative):** Because incidence is held fixed, the convex hull
+#' is invariant across permutations. Delta FRic under Model B is reported as
+#' \code{NA} (not applicable), not zero.
+#'
+#' **Model C (Identity):** Statistical power is limited when the regional species
+#' pool is small (< 15 species). With few species, the number of unique trait
+#' permutations is small, reducing the resolution of the null distribution.
+#' Consider increasing \code{n_perm} and interpreting marginal p-values
+#' (0.05 < p < 0.10) with caution.
+#'
+#' **Scope:** When multiple contrasts are evaluated simultaneously, the curveball
+#' operates on the full stacked matrix, assuming a shared regional species pool.
+#' For biogeographically independent sites, run \code{asc_null()} on each
+#' contrast separately.
+#'
 #' @importFrom vegan nullmodel
 #' @importFrom stats sd simulate
 #' @return The original object with an appended \code{null_models} data frame.
+#'
+#' @examples
+#' \donttest{
+#' traits <- data.frame(
+#'   Mass = c(15, 30, 60, 150, 400),
+#'   Beak = c(10, 15, 28,  45,  85),
+#'   Diet = factor(c(0, 1, 1, 1, 0))
+#' )
+#' rownames(traits) <- paste0("Sp", 1:5)
+#'
+#' abund <- rbind(
+#'   Reference = c(0, 10, 25, 20, 5),
+#'   Impacted  = c(30, 15,  5,  0, 0)
+#' )
+#'
+#' res <- asc_paired(
+#'   traits, abund,
+#'   sites = c("S1", "S1"),
+#'   time = c("Reference", "Impacted"),
+#'   ref_time = "Reference"
+#' )
+#' res <- asc_null(res, n_perm = 99, seed = 42)
+#' res$null_models
+#' }
+#'
 #' @export
 asc_null <- function(x, n_perm = 999, seed = NULL) {
 
   if(!inherits(x, c("ascfcd", "ascfcd_pw"))) stop("Input object must be of class 'ascfcd' or 'ascfcd_pw'.")
-  if (!requireNamespace("vegan", quietly = TRUE)) stop("The 'vegan' package is required.")
-  if (!requireNamespace("geometry", quietly = TRUE)) stop("The 'geometry' package is required.")
 
-  if(!is.null(seed)) set.seed(seed)
+  # Safe RNG handling: restore .Random.seed on exit
+  if(!is.null(seed)) {
+    if (exists(".Random.seed", envir = .GlobalEnv)) {
+      old_seed <- .GlobalEnv$.Random.seed
+      on.exit(.GlobalEnv$.Random.seed <- old_seed, add = TRUE)
+    } else {
+      on.exit(rm(".Random.seed", envir = .GlobalEnv), add = TRUE)
+    }
+    set.seed(seed)
+  }
+
   F_mat <- x$F_space
   entities <- names(x$directional_vectors)
 
+  # Build M matrix with explicit entity-to-row mapping
   M_list <- list()
+  entity_row_ref <- integer(length(entities))
+  entity_row_comp <- integer(length(entities))
+  names(entity_row_ref) <- names(entity_row_comp) <- entities
+
   for(s in entities) {
     M_list[[paste0(s, "_ref")]] <- x$p_ref[[s]]
     M_list[[paste0(s, "_comp")]] <- x$p_comp[[s]]
   }
   M <- do.call(rbind, M_list)
+
+  # Map each entity to its ref/comp row indices in M (explicit, not positional)
+  for (j in seq_along(entities)) {
+    entity_row_ref[entities[j]]  <- 2L * j - 1L
+    entity_row_comp[entities[j]] <- 2L * j
+  }
+
+  # Validation: row count must equal 2 * number of entities
+  stopifnot(nrow(M) == 2L * length(entities))
 
   M_bin <- ifelse(M > 0, 1, 0)
   nm_struct <- vegan::nullmodel(M_bin, method = "curveball")
@@ -39,22 +108,7 @@ asc_null <- function(x, n_perm = 999, seed = NULL) {
     return(vec)
   }
 
-  calc_topo <- function(p_vec, f_space) {
-    idx <- p_vec > 0
-    if(sum(idx) < 2) return(list(FDis=0, FRic=0))
-    p_pres <- p_vec[idx] / sum(p_vec[idx])
-    f_pres <- f_space[idx, , drop = FALSE]
-    cent <- colSums(p_pres * f_pres)
-    fdis <- sum(p_pres * sqrt(rowSums(sweep(f_pres, 2, cent, "-")^2)))
-
-    fric <- 0
-    if (sum(idx) > ncol(f_space)) {
-      fric <- tryCatch({ geometry::convhulln(f_pres, options = "FA")$vol }, error = function(e) 0)
-    }
-    return(list(FDis = fdis, FRic = fric))
-  }
-
-  # Contenedores para las 3 Familias de Modelos Nulos
+  # Containers for Model A (Structural) and Model C (Identity)
   null_pos_A <- matrix(NA, n_perm, length(entities)); colnames(null_pos_A) <- entities
   null_pos_B <- matrix(NA, n_perm, length(entities)); colnames(null_pos_B) <- entities
   null_pos_C <- matrix(NA, n_perm, length(entities)); colnames(null_pos_C) <- entities
@@ -64,55 +118,71 @@ asc_null <- function(x, n_perm = 999, seed = NULL) {
   null_fdis_C <- matrix(NA, n_perm, length(entities)); colnames(null_fdis_C) <- entities
 
   null_fric_A <- matrix(NA, n_perm, length(entities)); colnames(null_fric_A) <- entities
-  null_fric_B <- matrix(NA, n_perm, length(entities)); colnames(null_fric_B) <- entities
+  # null_fric_B intentionally omitted: incidence is fixed under Model B,
+  # so the convex hull is invariant. FRic has no null distribution.
   null_fric_C <- matrix(NA, n_perm, length(entities)); colnames(null_fric_C) <- entities
 
   for (i in 1:n_perm) {
-    # Matrices simuladas (A y B)
+    # Simulated matrices (A and B)
     mat_A_bin <- sims_struct[, , i]
     mat_A_rel <- sweep(mat_A_bin, 1, rowSums(mat_A_bin), "/"); mat_A_rel[is.na(mat_A_rel)] <- 0
+    # M already contains relative abundances; shuffle preserves row sums.
+    # Re-normalization is defensive (guards against floating-point drift).
     mat_B <- t(apply(M, 1, shuffle_nonzero))
-    mat_B_rel <- sweep(mat_B, 1, rowSums(mat_B), "/")
+    mat_B_rel <- mat_B  # already relative; no sweep needed
 
-    # Modelo C: Shuffled Trait Space (Identidades funcionales aleatorias)
+    # Model C: Shuffled Trait Space
     F_mat_shuf <- F_mat[sample(nrow(F_mat)), , drop = FALSE]
 
     row_idx <- 1
     for(s in entities) {
+      r_idx <- entity_row_ref[s]
+      c_idx <- entity_row_comp[s]
 
-      # --- MODELO A: ESTRUCTURAL (Curveball) ---
-      c_r_A <- mat_A_rel[row_idx, , drop=FALSE] %*% F_mat
-      c_c_A <- mat_A_rel[row_idx+1, , drop=FALSE] %*% F_mat
+      # --- MODEL A: STRUCTURAL (Curveball) ---
+      c_r_A <- mat_A_rel[r_idx, , drop=FALSE] %*% F_mat
+      c_c_A <- mat_A_rel[c_idx, , drop=FALSE] %*% F_mat
       null_pos_A[i, s] <- sqrt(sum((c_c_A - c_r_A)^2))
-      topo_r_A <- calc_topo(mat_A_rel[row_idx, ], F_mat)
-      topo_c_A <- calc_topo(mat_A_rel[row_idx+1, ], F_mat)
+      topo_r_A <- .calc_core_topology(mat_A_rel[r_idx, ], F_mat)
+      topo_c_A <- .calc_core_topology(mat_A_rel[c_idx, ], F_mat)
       null_fdis_A[i, s] <- topo_c_A$FDis - topo_r_A$FDis
       null_fric_A[i, s] <- topo_c_A$FRic - topo_r_A$FRic
 
-      # --- MODELO B: CUANTITATIVO (SAD Reshuffle) ---
-      c_r_B <- mat_B_rel[row_idx, , drop=FALSE] %*% F_mat
-      c_c_B <- mat_B_rel[row_idx+1, , drop=FALSE] %*% F_mat
+      # --- MODEL B: QUANTITATIVE (SAD Reshuffle) ---
+      c_r_B <- mat_B_rel[r_idx, , drop=FALSE] %*% F_mat
+      c_c_B <- mat_B_rel[c_idx, , drop=FALSE] %*% F_mat
       null_pos_B[i, s] <- sqrt(sum((c_c_B - c_r_B)^2))
-      topo_r_B <- calc_topo(mat_B_rel[row_idx, ], F_mat)
-      topo_c_B <- calc_topo(mat_B_rel[row_idx+1, ], F_mat)
+      topo_r_B <- .calc_core_topology(mat_B_rel[r_idx, ], F_mat)
+      topo_c_B <- .calc_core_topology(mat_B_rel[c_idx, ], F_mat)
       null_fdis_B[i, s] <- topo_c_B$FDis - topo_r_B$FDis
-      null_fric_B[i, s] <- topo_c_B$FRic - topo_r_B$FRic
+      # FRic under Model B: not evaluated (incidence fixed -> hull invariant)
 
-      # --- MODELO C: IDENTIDAD (Trait Shuffle / Riqueza Fija) ---
-      # Usamos las abundancias empíricas reales, pero el espacio funcional permutado
-      mat_r_real <- M[row_idx, , drop=FALSE] / sum(M[row_idx, ])
-      mat_c_real <- M[row_idx+1, , drop=FALSE] / sum(M[row_idx+1, ])
-
-      c_r_C <- mat_r_real %*% F_mat_shuf
-      c_c_C <- mat_c_real %*% F_mat_shuf
+      # --- MODEL C: IDENTITY (Trait Shuffle) ---
+      c_r_C <- M[r_idx, , drop=FALSE] %*% F_mat_shuf
+      c_c_C <- M[c_idx, , drop=FALSE] %*% F_mat_shuf
       null_pos_C[i, s] <- sqrt(sum((c_c_C - c_r_C)^2))
-      topo_r_C <- calc_topo(mat_r_real, F_mat_shuf)
-      topo_c_C <- calc_topo(mat_c_real, F_mat_shuf)
+      topo_r_C <- .calc_core_topology(as.numeric(M[r_idx, ]), F_mat_shuf)
+      topo_c_C <- .calc_core_topology(as.numeric(M[c_idx, ]), F_mat_shuf)
       null_fdis_C[i, s] <- topo_c_C$FDis - topo_r_C$FDis
       null_fric_C[i, s] <- topo_c_C$FRic - topo_r_C$FRic
-
-      row_idx <- row_idx + 2
     }
+  }
+
+  # Evaluation helper with robust sd guard
+  eval_null <- function(obs, null_dist, two_tailed = FALSE) {
+    if (all(is.na(null_dist))) return(list(SES = NA_real_, P = NA_real_))
+    null_dist_clean <- null_dist[!is.na(null_dist)]
+    if (length(null_dist_clean) < 2) return(list(SES = NA_real_, P = NA_real_))
+    sd_val <- stats::sd(null_dist_clean)
+    if (sd_val < 1e-12) return(list(SES = NaN, P = 1.000))
+    ses <- (obs - mean(null_dist_clean)) / sd_val
+    n_eff <- length(null_dist_clean)
+    pval <- if(two_tailed) {
+      (sum(abs(null_dist_clean) >= abs(obs)) + 1) / (n_eff + 1)
+    } else {
+      (sum(null_dist_clean >= obs) + 1) / (n_eff + 1)
+    }
+    return(list(SES = ses, P = pval))
   }
 
   df_res <- data.frame()
@@ -120,13 +190,6 @@ asc_null <- function(x, n_perm = 999, seed = NULL) {
     obs_pos <- if(!is.null(x$site_results[[s]]$abs_dist)) x$site_results[[s]]$abs_dist else x$pairwise_results$Delta_C_abs[x$pairwise_results$Community_A == strsplit(s, "_vs_")[[1]][1] & x$pairwise_results$Community_B == strsplit(s, "_vs_")[[1]][2]]
     obs_fdis <- if(!is.null(x$site_results[[s]]$Delta_FDis)) x$site_results[[s]]$Delta_FDis else x$pairwise_results$Delta_FDis[x$pairwise_results$Community_A == strsplit(s, "_vs_")[[1]][1] & x$pairwise_results$Community_B == strsplit(s, "_vs_")[[1]][2]]
     obs_fric <- if(!is.null(x$site_results[[s]]$Delta_FRic)) x$site_results[[s]]$Delta_FRic else x$pairwise_results$Delta_FRic[x$pairwise_results$Community_A == strsplit(s, "_vs_")[[1]][1] & x$pairwise_results$Community_B == strsplit(s, "_vs_")[[1]][2]]
-
-    eval_null <- function(obs, null_dist, two_tailed = FALSE) {
-      if(stats::sd(null_dist) == 0) return(list(SES = NaN, P = 1.000))
-      ses <- (obs - mean(null_dist)) / stats::sd(null_dist)
-      pval <- if(two_tailed) (sum(abs(null_dist) >= abs(obs)) + 1) / (n_perm + 1) else (sum(null_dist >= obs) + 1) / (n_perm + 1)
-      return(list(SES = ses, P = pval))
-    }
 
     e_pos_A <- eval_null(obs_pos, null_pos_A[, s], FALSE)
     e_pos_B <- eval_null(obs_pos, null_pos_B[, s], FALSE)
@@ -137,7 +200,8 @@ asc_null <- function(x, n_perm = 999, seed = NULL) {
     e_fdis_C <- eval_null(obs_fdis, null_fdis_C[, s], TRUE)
 
     e_fric_A <- eval_null(obs_fric, null_fric_A[, s], TRUE)
-    e_fric_B <- eval_null(obs_fric, null_fric_B[, s], TRUE)
+    # FRic under Model B: bypass (not applicable)
+    e_fric_B <- list(SES = NA_real_, P = NA_real_)
     e_fric_C <- eval_null(obs_fric, null_fric_C[, s], TRUE)
 
     df_res <- rbind(df_res,

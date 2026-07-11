@@ -12,10 +12,32 @@ asc_transitions(x, ...)
 \item{...}{Further arguments passed to or from other methods.}
 }
 \value{
-A list of data frames containing species leverage for each contrast.
+An S3 object of class \code{ascfcd_transitions}.
 }
 \description{
 Calculates the multidimensional Functional Leverage of each species,
 quantifying their direct contribution to the positional shift (Layer 1 - Delta C)
 of the ecosystem.
+}
+\examples{
+traits <- data.frame(
+  Mass = c(15, 30, 60, 150, 400),
+  Beak = c(10, 15, 28,  45,  85)
+)
+rownames(traits) <- paste0("Sp", 1:5)
+
+abund <- rbind(
+  Ref = c(0, 10, 25, 20, 5),
+  Imp = c(30, 15,  5,  0, 0)
+)
+
+res <- asc_paired(
+  traits, abund,
+  sites = c("S1", "S1"),
+  time = c("R", "I"), ref_time = "R",
+  dist_method = "euclidean"
+)
+drivers <- asc_transitions(res)
+drivers$S1$species_leverage
+
 }

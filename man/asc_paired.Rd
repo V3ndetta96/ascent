@@ -42,3 +42,42 @@ An S3 object of class \code{ascfcd}.
 Calculates centroid displacement (Layer 1), dispersion shift (Layer 2 - FDis),
 and volume shift (Layer 3 - FRic) between paired states.
 }
+\note{
+\strong{Normalization:} Delta FDis and Delta FRic are absolute differences, not
+normalized by the regional pool. Values are not directly comparable across
+studies with different species pools or trait scales. Only rDelta_C (position)
+is normalized by Dmax_regional.
+
+\strong{FRic = NA:} When a community has fewer species than retained PCoA axes,
+the convex hull is geometrically undefined and FRic is set to \code{NA},
+which propagates to Delta_FRic.
+
+\strong{Temporal replicates:} When multiple rows share the same site and temporal
+state (e.g., three reference plots), their relative abundances are averaged
+(column means) before computing the centroid. This is equivalent to treating
+replicates as a single pooled community. Intra-state variability is not
+propagated to downstream metrics.
+}
+\examples{
+# Simulate deforestation impact on a bird community
+traits <- data.frame(
+  Mass  = c(15, 30, 60, 150, 400),
+  Beak  = c(10, 15, 28,  45,  85),
+  Diet  = factor(c(0, 1, 1, 1, 0))
+)
+rownames(traits) <- paste0("Sp", 1:5)
+
+abund <- rbind(
+  Reference = c(0, 10, 25, 20, 5),
+  Impacted  = c(30, 15,  5,  0, 0)
+)
+
+res <- asc_paired(
+  traits, abund,
+  sites = c("Site1", "Site1"),
+  time = c("Reference", "Impacted"),
+  ref_time = "Reference"
+)
+summary(res)
+
+}

@@ -15,6 +15,6 @@
 Invisibly returns a data frame with the displacement metrics.
 }
 \description{
-Provides a concise, multi-layer overview of the paired ASC-FCD analysis,
+Provides a concise, multi-layer overview of the paired ASC-CFD analysis,
 including null models and top functional drivers.
 }

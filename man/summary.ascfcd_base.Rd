@@ -7,7 +7,7 @@
 \method{summary}{ascfcd_base}(object, ...)
 }
 \arguments{
-\item{object}{An object of class \code{ascfcd_ent}.}
+\item{object}{An object of class \code{ascfcd_base}.}
 
 \item{...}{Further arguments passed to or from other methods.}
 }

@@ -1,7 +1,7 @@
 #' Summary for Paired Functional Centroid Displacement
 #'
 #' @description
-#' Provides a concise, multi-layer overview of the paired ASC-FCD analysis,
+#' Provides a concise, multi-layer overview of the paired ASC-CFD analysis,
 #' including null models and top functional drivers.
 #'
 #' @param object An object of class \code{ascfcd}.
@@ -11,12 +11,13 @@
 #' @export
 summary.ascfcd <- function(object, ...) {
   cat("==================================================\n")
-  cat(" ASC-FCD: Multidimensional Functional Restructuring \n")
+  cat(" ASC-CFD: Multidimensional Functional Restructuring \n")
   cat("==================================================\n\n")
 
   cat(sprintf("Number of Contrasts: %d\n", length(object$rDelta_C)))
   cat(sprintf("Functional Dimensionality (k): %d (Explaining %.1f%% of variance)\n",
               object$k_retained, object$var_retained * 100))
+  cat(sprintf("PCoA Quality: %.1f%%\n", object$quality * 100))
 
   df_dist <- data.frame(
     Contrast = names(object$rDelta_C),
@@ -25,18 +26,14 @@ summary.ascfcd <- function(object, ...) {
     Layer3_DeltaFRic = round(sapply(object$site_results, function(x) x$Delta_FRic), 4)
   )
 
-  df_dist$Topology_Trend <- ifelse(df_dist$Layer3_DeltaFRic > 0, "Volume Expansion",
-                                   ifelse(df_dist$Layer3_DeltaFRic < 0, "Volume Contraction",
-                                          ifelse(df_dist$Layer2_DeltaFDis > 0.01, "Internal Expansion",
-                                                 ifelse(df_dist$Layer2_DeltaFDis < -0.01, "Internal Contraction", "Stable"))))
-
   cat("\n--- Functional Shift Overview ---\n")
   print(df_dist, row.names = FALSE)
   cat("\n")
 
   if (!is.null(object$null_models)) {
     cat("--- Multi-Level Null Model Evaluation ---\n")
-    cat("Struct: Incidence Filter | Quant: Demographic Filter | Identity: Trait Filter\n\n")
+    cat("Struct: Incidence Filter | Quant: Demographic Filter | Identity: Trait Filter\n")
+    cat("Note: FRic under Quantitative filter is NA (incidence fixed -> hull invariant)\n\n")
     print(object$null_models, row.names = FALSE)
     cat("\n")
   } else {
@@ -63,7 +60,7 @@ summary.ascfcd <- function(object, ...) {
 #' Summary for Pairwise Functional Spatial Divergence
 #'
 #' @description
-#' Provides a comprehensive overview of the spatial network ASC-FCD analysis.
+#' Provides a comprehensive overview of the spatial network ASC-CFD analysis.
 #'
 #' @param object An object of class \code{ascfcd_pw}.
 #' @param ... Further arguments passed to or from other methods.
@@ -72,28 +69,31 @@ summary.ascfcd <- function(object, ...) {
 #' @export
 summary.ascfcd_pw <- function(object, ...) {
   cat("==================================================\n")
-  cat(" ASC-FCD: Pairwise Spatial Functional Network \n")
+  cat(" ASC-CFD: Pairwise Spatial Functional Network \n")
   cat("==================================================\n\n")
 
   n_com <- nrow(object$cwm_global)
   n_pairs <- nrow(object$pairwise_results)
 
   cat(sprintf("Communities Analyzed: %d | Spatial Contrasts: %d\n", n_com, n_pairs))
-  cat(sprintf("Functional Dimensionality (k): %d (Explaining %.1f%% of variance)\n\n",
+  cat(sprintf("Functional Dimensionality (k): %d (Explaining %.1f%% of variance)\n",
               object$k_retained, object$var_retained * 100))
+  cat(sprintf("PCoA Quality: %.1f%%\n\n", object$quality * 100))
 
   cat("--- Global Divergence Summary ---\n")
   rdelta <- object$pairwise_results$rDelta_C_pct
   fdis_shifts <- object$pairwise_results$Delta_FDis
   fric_shifts <- object$pairwise_results$Delta_FRic
 
-  cat(sprintf(" Mean Position Shift (rDelta_C): %6.2f%%\n", mean(rdelta)))
-  cat(sprintf(" Mean Dispersion Shift (Delta_FDis): %6.4f\n", mean(fdis_shifts)))
-  cat(sprintf(" Mean Volume Shift (Delta_FRic): %6.4f\n\n", mean(fric_shifts)))
+  cat(sprintf(" Mean Position Shift (rDelta_C): %6.2f%%\n", mean(rdelta, na.rm = TRUE)))
+  cat(sprintf(" Mean Dispersion Shift (Delta_FDis): %6.4f\n", mean(fdis_shifts, na.rm = TRUE)))
+  cat(sprintf(" Mean Volume Shift (Delta_FRic): %s\n\n",
+              if(all(is.na(fric_shifts))) "NA" else sprintf("%6.4f", mean(fric_shifts, na.rm = TRUE))))
 
   if (!is.null(object$null_models)) {
     cat("--- Multi-Level Null Model Evaluation (Head) ---\n")
-    cat("Struct: Incidence Filter | Quant: Demographic Filter | Identity: Trait Filter\n\n")
+    cat("Struct: Incidence Filter | Quant: Demographic Filter | Identity: Trait Filter\n")
+    cat("Note: FRic under Quantitative filter is NA (incidence fixed -> hull invariant)\n\n")
     print(utils::head(object$null_models, 10), row.names = FALSE)
     cat("\n")
   }
@@ -120,19 +120,20 @@ summary.ascfcd_pw <- function(object, ...) {
 #' @description
 #' Provides an overview of the baseline functional topology of the evaluated entities.
 #'
-#' @param object An object of class \code{ascfcd_ent}.
+#' @param object An object of class \code{ascfcd_base}.
 #' @param ... Further arguments passed to or from other methods.
 #'
 #' @return Invisibly returns the entities results data frame.
 #' @export
 summary.ascfcd_base <- function(object, ...) {
   cat("==================================================\n")
-  cat(" ASC-FCD: Baseline Functional Topology \n")
+  cat(" ASC-CFD: Baseline Functional Topology \n")
   cat("==================================================\n\n")
 
   cat(sprintf("Entities Analyzed: %d\n", nrow(object$entities_results)))
-  cat(sprintf("Functional Dimensionality (k): %d (Explaining %.1f%% of variance)\n\n",
+  cat(sprintf("Functional Dimensionality (k): %d (Explaining %.1f%% of variance)\n",
               object$k_retained, object$var_retained * 100))
+  cat(sprintf("PCoA Quality: %.1f%%\n\n", object$quality * 100))
 
   cat("--- Absolute Entity Metrics ---\n")
 
@@ -159,7 +160,7 @@ summary.ascfcd_base <- function(object, ...) {
 #' @export
 summary.ascfcd_entities <- function(object, ...) {
   cat("==================================================\n")
-  cat(" ASC-FCD: Functional Entities Classification \n")
+  cat(" ASC-CFD: Functional Entities Classification \n")
   cat("==================================================\n\n")
 
   df <- object$entity_classification
@@ -181,4 +182,36 @@ summary.ascfcd_entities <- function(object, ...) {
   cat("\n")
 
   invisible(df)
+}
+
+#' Summary for Functional Leverage Analysis
+#'
+#' @description
+#' Provides an overview of the species leverage for each contrast.
+#'
+#' @param object An object of class \code{ascfcd_transitions}.
+#' @param n_sp Integer. Number of top species to display per contrast. Default is 5.
+#' @param ... Further arguments passed to or from other methods.
+#'
+#' @return Invisibly returns the object.
+#' @export
+summary.ascfcd_transitions <- function(object, n_sp = 5, ...) {
+  cat("==================================================\n")
+  cat(" ASC-CFD: Functional Leverage Analysis \n")
+  cat("==================================================\n\n")
+
+  cat(sprintf("Contrasts Analyzed: %d\n\n", length(object)))
+
+  for (s in names(object)) {
+    cat(sprintf("--- %s ---\n", s))
+    df <- object[[s]]$species_leverage
+    print_df <- utils::head(df, n_sp)
+    # Round for display only
+    num_cols <- sapply(print_df, is.numeric)
+    print_df[, num_cols] <- round(print_df[, num_cols], 4)
+    print(print_df, row.names = FALSE)
+    cat("\n")
+  }
+
+  invisible(object)
 }

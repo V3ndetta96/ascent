@@ -12,55 +12,34 @@
 #' @param na.rm Logical. Remove missing values? Default is TRUE.
 #'
 #' @return An S3 object of class \code{ascfcd_base}.
+#'
+#' @examples
+#' traits <- data.frame(
+#'   Mass = c(15, 30, 60, 150, 400),
+#'   Beak = c(10, 15, 28,  45,  85)
+#' )
+#' rownames(traits) <- paste0("Sp", 1:5)
+#'
+#' abund <- rbind(
+#'   Forest = c(0,  5, 25, 20, 10),
+#'   Field  = c(30, 20, 10,  0,  0)
+#' )
+#'
+#' base <- asc_baseline(traits, abund, dist_method = "euclidean")
+#' summary(base)
+#'
 #' @export
 asc_baseline <- function(traits, abund, dist_method = "gower",
                          dim_retention = c("variance", "broken_stick"), var_tol = 0.80, na.rm = TRUE) {
 
   dim_retention <- match.arg(dim_retention)
-  if (!requireNamespace("geometry", quietly = TRUE)) {
-    stop("The 'geometry' package is required for FRic calculations.")
-  }
 
   if(nrow(traits) != ncol(abund)) stop("Number of species in traits and abundances does not match.")
   abund_rel <- as.matrix(sweep(abund, 1, rowSums(abund, na.rm = na.rm), "/"))
 
-  d_mat <- cluster::daisy(traits, metric = dist_method)
-  pcoa_res <- suppressWarnings(stats::cmdscale(d_mat, k = nrow(traits) - 1, eig = TRUE))
-
-  eig_raw <- pcoa_res$eig
-  eig_pos <- eig_raw[eig_raw > 1e-8]
-  rel_var <- eig_pos / sum(eig_pos)
-  cum_var <- cumsum(rel_var)
-
-  if (dim_retention == "variance") {
-    k_valid <- min(which(cum_var >= var_tol))
-  } else if (dim_retention == "broken_stick") {
-    n_eig <- length(eig_pos)
-    bs_expected <- sapply(1:n_eig, function(k) sum(1 / (k:n_eig)) / n_eig)
-    k_valid <- sum(rel_var > bs_expected)
-  }
-  if(k_valid < 2) k_valid <- 2
-
-  axis_var <- rel_var[1:k_valid]
-  total_var_retained <- cum_var[k_valid]
-  F_mat <- pcoa_res$points[, 1:k_valid, drop = FALSE]
-  colnames(F_mat) <- paste0("Axis_", 1:k_valid)
-
-  # Motor Topológico Base
-  calc_topo <- function(p_vec, f_space) {
-    idx <- p_vec > 0
-    if(sum(idx) < 2) return(list(FDis = 0, FRic = 0))
-    p_pres <- p_vec[idx] / sum(p_vec[idx])
-    f_pres <- f_space[idx, , drop = FALSE]
-    cent <- colSums(p_pres * f_pres)
-    fdis <- sum(p_pres * sqrt(rowSums(sweep(f_pres, 2, cent, "-")^2)))
-
-    fric <- 0
-    if (sum(idx) > ncol(f_space)) {
-      fric <- tryCatch({ geometry::convhulln(f_pres, options = "FA")$vol }, error = function(e) 0)
-    }
-    return(list(FDis = fdis, FRic = fric))
-  }
+  fs <- .build_functional_space(traits, dist_method, dim_retention, var_tol)
+  F_mat <- fs$F_mat
+  k_valid <- fs$k_retained
 
   cwm_global <- abund_rel %*% F_mat
   entities <- rownames(abund_rel)
@@ -74,7 +53,7 @@ asc_baseline <- function(traits, abund, dist_method = "gower",
   fric_vals <- numeric(length(entities))
 
   for(i in seq_along(entities)) {
-    topo <- calc_topo(abund_rel[i, ], F_mat)
+    topo <- .calc_core_topology(abund_rel[i, ], F_mat)
     fdis_vals[i] <- topo$FDis
     fric_vals[i] <- topo$FRic
   }
@@ -87,8 +66,9 @@ asc_baseline <- function(traits, abund, dist_method = "gower",
     cwm_global = cwm_global,
     F_space = F_mat,
     k_retained = k_valid,
-    var_retained = total_var_retained,
-    axis_var = axis_var,
+    var_retained = fs$var_retained,
+    axis_var = fs$axis_var,
+    quality = fs$quality,
     original_traits = traits,
     original_abund = abund_rel
   )

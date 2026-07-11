@@ -20,3 +20,50 @@ The original object with an appended \code{null_models} data frame.
 Evaluates the statistical significance of functional shifts using three null models:
 Structural (Curveball), Quantitative (SAD Reshuffle), and Identity (Trait Shuffle).
 }
+\note{
+\strong{Model A (Structural):} After curveball permutation, all species present
+receive uniform relative abundance (1/S_local). This means the null distribution
+for FDis conflates the effect of taxonomic identity with the assumption of
+equitability. The SES tests whether the observed shift is extreme given
+random species composition, \emph{not} given random composition with the observed SAD.
+
+\strong{Model B (Quantitative):} Because incidence is held fixed, the convex hull
+is invariant across permutations. Delta FRic under Model B is reported as
+\code{NA} (not applicable), not zero.
+
+\strong{Model C (Identity):} Statistical power is limited when the regional species
+pool is small (< 15 species). With few species, the number of unique trait
+permutations is small, reducing the resolution of the null distribution.
+Consider increasing \code{n_perm} and interpreting marginal p-values
+(0.05 < p < 0.10) with caution.
+
+\strong{Scope:} When multiple contrasts are evaluated simultaneously, the curveball
+operates on the full stacked matrix, assuming a shared regional species pool.
+For biogeographically independent sites, run \code{asc_null()} on each
+contrast separately.
+}
+\examples{
+\donttest{
+traits <- data.frame(
+  Mass = c(15, 30, 60, 150, 400),
+  Beak = c(10, 15, 28,  45,  85),
+  Diet = factor(c(0, 1, 1, 1, 0))
+)
+rownames(traits) <- paste0("Sp", 1:5)
+
+abund <- rbind(
+  Reference = c(0, 10, 25, 20, 5),
+  Impacted  = c(30, 15,  5,  0, 0)
+)
+
+res <- asc_paired(
+  traits, abund,
+  sites = c("S1", "S1"),
+  time = c("Reference", "Impacted"),
+  ref_time = "Reference"
+)
+res <- asc_null(res, n_perm = 99, seed = 42)
+res$null_models
+}
+
+}

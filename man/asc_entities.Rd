@@ -30,3 +30,15 @@ An S3 object of class \code{ascfcd_entities}.
 Clusters species into discrete functional entities based on shared
 morphological, physiological, or ecological traits.
 }
+\examples{
+traits <- data.frame(
+  Mass = c(15, 30, 60, 150, 400),
+  Beak = c(10, 15, 28,  45,  85),
+  Diet = factor(c(0, 1, 1, 1, 0))
+)
+rownames(traits) <- paste0("Sp", 1:5)
+
+ent <- asc_entities(traits, k = 2)
+summary(ent)
+
+}

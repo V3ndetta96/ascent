@@ -1,3 +1,9 @@
 ^ascent\.Rproj$
 ^\.Rproj\.user$
 ^LICENSE\.md$
+^GEMINI\.md$
+^ASCFCD_technical_document\.md$
+^ASCFCD_documento_tecnico\.md$
+^tests/functional_tests\.R$
+^doc$
+^Meta$
