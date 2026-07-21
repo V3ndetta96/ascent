@@ -203,6 +203,8 @@ plot.ascfcd_pw <- function(x, contrast, type = c("both", "pcoa", "leverage"), n_
 #' @param x An object of class \code{ascfcd_entities}.
 #' @param ... Additional graphical arguments passed to \code{plot.hclust}.
 #'
+#' @return No return value, called for side effects (plots a dendrogram).
+#'
 #' @export
 plot.ascfcd_entities <- function(x, ...) {
   plot(x$hclust_obj, main = "Functional Entities Dendrogram",

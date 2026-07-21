@@ -63,16 +63,8 @@ asc_null <- function(x, n_perm = 999, seed = NULL) {
 
   if(!inherits(x, c("ascfcd", "ascfcd_pw"))) stop("Input object must be of class 'ascfcd' or 'ascfcd_pw'.")
 
-  # Safe RNG handling: restore .Random.seed on exit
-  if(!is.null(seed)) {
-    if (exists(".Random.seed", envir = .GlobalEnv)) {
-      old_seed <- .GlobalEnv$.Random.seed
-      on.exit(.GlobalEnv$.Random.seed <- old_seed, add = TRUE)
-    } else {
-      on.exit(rm(".Random.seed", envir = .GlobalEnv), add = TRUE)
-    }
-    set.seed(seed)
-  }
+  # Set seed for reproducibility if provided
+  if(!is.null(seed)) set.seed(seed)
 
   F_mat <- x$F_space
   entities <- names(x$directional_vectors)

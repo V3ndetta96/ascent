@@ -4,6 +4,7 @@
 ^GEMINI\.md$
 ^ASCFCD_technical_document\.md$
 ^ASCFCD_documento_tecnico\.md$
+^manuscript_outline\.md$
 ^tests/functional_tests\.R$
 ^doc$
 ^Meta$

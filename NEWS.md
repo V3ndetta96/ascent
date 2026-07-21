@@ -1,5 +1,12 @@
-# ascent 0.1.0
+# ascent 0.1.1
 
+## CRAN Resubmission Updates
+
+* Expanded ASC-CFD acronym in `DESCRIPTION` to 'ASC-CFD' (Assemblage Shift Characterization - Community Functional Dynamics).
+* Added missing `\value` tag in `plot.ascfcd_entities.Rd`.
+* Refactored random number generation (RNG) in `asc_null()` to strictly comply with CRAN policies regarding `.GlobalEnv` and `.Random.seed` manipulation.
+
+# ascent 0.1.0
 ## Initial CRAN release
 
 ### Core Framework
@@ -20,8 +27,7 @@
 * Model A (Structural): Curveball algorithm preserving richness and prevalence.
 * Model B (Quantitative): SAD reshuffle with fixed incidence. FRic reported as NA (hull invariant).
 * Model C (Identity): Trait shuffle breaking species-trait association.
-* Safe RNG handling with `on.exit()` seed restoration.
 
 ### Validation
-* 28 `testthat` unit tests covering class structure, edge cases, orthogonal scenarios, null model isolation, RNG safety, and leverage additivity.
+* 28 `testthat` unit tests covering class structure, edge cases, orthogonal scenarios, null model isolation, and leverage additivity.
 * 61 functional tests (standalone script) including cross-validation against manual computation.

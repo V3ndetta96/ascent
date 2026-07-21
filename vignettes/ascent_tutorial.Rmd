@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 
 ## Part I - Conceptual Framework
 
-The `ascent` package implements the **ASC-CFD** (Asymmetric Shift and Community Functional Dynamics) framework. Communities can exhibit identical levels of functional turnover while following fundamentally different ecological trajectories. One community may experience a directional shift in its functional equilibrium, another may simply reorganize biomass internally, and a third may expand into previously unoccupied regions of trait space. Traditional metrics often collapse these distinct processes into a single value. `ascent` instead uses a multi-layer topological approach to decompose community restructuring into three orthogonal geometric components:
+The `ascent` package implements the **ASC-CFD** (Assemblage Shift Characterization — Community Functional Dynamics) framework. Communities can exhibit identical levels of functional turnover while following fundamentally different ecological trajectories. One community may experience a directional shift in its functional equilibrium, another may simply reorganize biomass internally, and a third may expand into previously unoccupied regions of trait space. Traditional metrics often collapse these distinct processes into a single value. `ascent` instead uses a multi-layer topological approach to decompose community restructuring into three orthogonal geometric components:
 
 1. **Positional Shift ($r\Delta C_{\%}$):** The net directional displacement of the community centroid.
 2. **Dispersive Shift ($\Delta FDis$):** The internal demographic reorganization (expansion or contraction of niche variance).

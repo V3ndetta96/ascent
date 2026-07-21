@@ -2,7 +2,7 @@
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20388186.svg)](https://doi.org/10.5281/zenodo.20388186)
 
-The **`ascent`** package implements the **ASC-CFD** (Asymmetric Shift and Community Functional Dynamics) framework.
+The **`ascent`** package implements the **ASC-CFD** (Assemblage Shift Characterization — Community Functional Dynamics) framework.
 
 Most functional diversity metrics quantify how much communities differ,
 but provide little information about how those differences are organized

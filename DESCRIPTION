@@ -1,17 +1,18 @@
 Package: ascent
 Title: Multi-Layer Decomposition of Functional Community Restructuring
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: c(
     person("Rogelio R.", "Muñoz-Li", email = "munozrogelio16@gmail.com", role = c("aut", "cre")),
     person("Flavia", "Alvarez-Denis", role = "aut")
     )
-Description: Implements the ASC-CFD framework for decomposing functional
-    community restructuring into positional (centroid displacement),
-    dispersive (functional dispersion), and boundary (convex hull volume)
-    components. Provides hierarchical null models (structural, quantitative,
-    identity) to evaluate statistical significance and species-level leverage
-    analysis to identify taxa driving functional shifts. Supports both
-    temporal (paired) and spatial (pairwise) comparisons.
+Description: Implements the 'ASC-CFD' (Assemblage Shift Characterization -
+    Community Functional Dynamics) framework for decomposing functional community
+    restructuring into positional (centroid displacement), dispersive
+    (functional dispersion), and boundary (convex hull volume) components.
+    Provides hierarchical null models (structural, quantitative, identity)
+    to evaluate statistical significance and species-level leverage analysis
+    to identify taxa driving functional shifts. Supports both temporal
+    (paired) and spatial (pairwise) comparisons.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

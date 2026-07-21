@@ -11,6 +11,9 @@
 
 \item{...}{Additional graphical arguments passed to \code{plot.hclust}.}
 }
+\value{
+No return value, called for side effects (plots a dendrogram).
+}
 \description{
 Plots the hierarchical clustering dendrogram of the functional entities.
 }

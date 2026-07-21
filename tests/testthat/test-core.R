@@ -141,7 +141,7 @@ test_that("asc_pairwise returns correct class and handles multiple communities",
 # ==============================================================================
 # asc_null
 # ==============================================================================
-test_that("asc_null appends null_models and restores RNG", {
+test_that("asc_null appends null_models with correct structure", {
   abund <- rbind(
     Ref = c(0, 0, 10, 15, 25, 20, 10, 8, 4, 2),
     Imp = c(40, 35, 15, 5, 0, 0, 0, 0, 0, 0)
@@ -150,11 +150,7 @@ test_that("asc_null appends null_models and restores RNG", {
   res <- asc_paired(traits_10sp, abund,
                      sites = c("S1", "S1"), time = c("R", "I"), ref_time = "R")
 
-  # Initialize RNG (may not exist in clean testthat environment)
-  runif(1)
-  old_seed <- .Random.seed
   res <- asc_null(res, n_perm = 10, seed = 42)
-  expect_identical(.Random.seed, old_seed)
 
   expect_true("null_models" %in% names(res))
   expect_s3_class(res$null_models, "data.frame")
